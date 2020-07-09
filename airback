@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# 20200404 jens heine
+# 20200413 jens heine: FTPS mode enabled
+# 20200710 jens heine <binbash@gmx.net>
+#          benjamin heine
+#          dennis brossat
+#
+# airback - backup your mobile device over wifi
+#
+set -e
+
+#REMOTE_BASE_DIR="/mnt"
+REMOTE_IS_ALREADY_MOUNTED=0
+VERBOSITY="v"
+RSYNC_CMD="nice -n 20 rsync -${VERBOSITY}rultR --chmod=774"
+# Note: Enable implicit ssl mode on server
+# REMOTE_FTPS_HOST="IP:PORT"
+REMOTE_FTPS_HOST="x.x.x.x:5"
+REMOTE_FTPS_USER="sftpuser"
+REMOTE_FTPS_USER_PASS="sftppassword"
+
+#
+# MAIN
+#
+
+clear
+# Source confi file
+[ 
+
+[ -d ${LOCAL_MOBILE_MOUNTPOINT_BASE} ] || {
+	echo "-> Remote dir not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
+
+        exit 1
+}
+
+[ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
+	echo "-> Local dir not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
+        exit 1
+}
+
+echo "-------------------------------------"
+echo "- Starting handy backup program...  -"
+echo "-------------------------------------"
+
+echo "-> Trying to mount handy filesystem..."
+set +e
+df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
+REMOTE_IS_ALREADY_MOUNTED=$?
+set -e
+if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
+  curlftpfs -o ssl,no_verify_hostname,no_verify_peer,user=${REMOTE_FTPS_USER}:${REMOTE_FTPS_USER_PASS} ftps://${REMOTE_FTPS_HOST}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 
+  echo "-> Handy mounted."
+else
+  echo "-> Handy is already mounted."
+fi
+
+cd ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+
+set +e
+#-------------Copy Folders START-------------------#
+echo "-> Syncing DCIM/Camera..."
+${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing DCIM/Screenshots..."
+${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing Pictures..."
+${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing Movies..."
+${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing Music..."
+${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing Telegram..."
+${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing WhatsApp..."
+${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#--------------------------------------------------#
+echo "-> Syncing Signal..."
+${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#-------------Copy Folders END---------------------#
+set -e
+
+cd - 2>&1 >/dev/null
+echo "-> Unmounting handy filesystem..."
+fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 
+
+echo "-> Backup done."
+
