@@ -10,6 +10,10 @@
 #
 set -e
 
+# Base directory for airback
+AIRBACK_ROOT_DIR="~/airback/"
+AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
+
 #REMOTE_BASE_DIR="/mnt"
 REMOTE_IS_ALREADY_MOUNTED=0
 VERBOSITY="v"
@@ -24,15 +28,38 @@ REMOTE_FTPS_USER_PASS="sftppassword"
 # MAIN
 #
 
-clear
-# Source confi file
-[ 
-
-[ -d ${LOCAL_MOBILE_MOUNTPOINT_BASE} ] || {
-	echo "-> Remote dir not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
-
-        exit 1
+# Check and source config file
+[ -r ${AIRBACK_CONFIG_FILE} ] || {
+	echo "Error config file not found: ${AIRBACK_CONFIG_FILE}"
+	exit 1
 }
+
+# Check LOCAL_MOBILE_MOUNTPOINT_BASE
+[ -d ${LOCAL_MOBILE_MOUNTPOINT_BASE} ] || {
+	echo "-> Local mobile mountpoint base folder not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
+	mkdir -p ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+	RET_VAL=$?
+	[ $RET_VAL -ne 0 ] {
+		echo "Error creating local mobile mountpoint base folder."
+	        exit 1
+	}
+	echo "Local local mobile mountpoint base folder created."
+}
+
+# Check LOCAL_BACKUP_TARGET_BASE_DIR
+[ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
+        echo "-> Local backup target base folder not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
+        mkdir -p ${LOCAL_BACKUP_TARGET_BASE_DIR}
+        RET_VAL=$?
+        [ $RET_VAL -ne 0 ] {
+                echo "Error creating local  backup target base folder."
+                exit 1
+        }
+	echo "Local backup target base folder created."
+}
+
+
+
 
 [ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
 	echo "-> Local dir not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
