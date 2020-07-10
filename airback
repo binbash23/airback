@@ -15,6 +15,7 @@
 # VARIABLES
 #
 # Base directory for airback
+VERSION="202007100247"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG=1
