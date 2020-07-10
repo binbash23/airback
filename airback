@@ -8,21 +8,20 @@
 #
 # airback - backup your mobile device over wifi
 #
-set -e
+#set -e
+#set -x
 
+#
+# VARIABLES
+#
 # Base directory for airback
-AIRBACK_ROOT_DIR="~/airback/"
+AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
-
-#REMOTE_BASE_DIR="/mnt"
+DEBUG=1
 REMOTE_IS_ALREADY_MOUNTED=0
 VERBOSITY="v"
 RSYNC_CMD="nice -n 20 rsync -${VERBOSITY}rultR --chmod=774"
-# Note: Enable implicit ssl mode on server
-# REMOTE_FTPS_HOST="IP:PORT"
-REMOTE_FTPS_HOST="x.x.x.x:5"
-REMOTE_FTPS_USER="sftpuser"
-REMOTE_FTPS_USER_PASS="sftppassword"
+NMAP_CMD="nice -n 20 nmap "
 
 #
 # MAIN
@@ -33,88 +32,153 @@ REMOTE_FTPS_USER_PASS="sftppassword"
 	echo "Error config file not found: ${AIRBACK_CONFIG_FILE}"
 	exit 1
 }
+. ${AIRBACK_CONFIG_FILE}
 
-# Check LOCAL_MOBILE_MOUNTPOINT_BASE
-[ -d ${LOCAL_MOBILE_MOUNTPOINT_BASE} ] || {
-	echo "-> Local mobile mountpoint base folder not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
-	mkdir -p ${LOCAL_MOBILE_MOUNTPOINT_BASE}
-	RET_VAL=$?
-	[ $RET_VAL -ne 0 ] {
-		echo "Error creating local mobile mountpoint base folder."
-	        exit 1
+# todo check config variables...
+
+#
+# FUNCTIONS
+#
+# Args: IP PORT
+checkForRunningPortServer() {
+	logInfo "Checking for mobile..."
+	[ "$1" -a "$2" ] || {
+		echo "Host or port missing."
+		exit 1
 	}
-	echo "Local local mobile mountpoint base folder created."
+	${NMAP_CMD} ${1} -p ${2} | grep "open" >/dev/null 2>&1
+	RET_VAL=$?
+	[ "${RET_VAL}" -eq 0 ] && {
+		logInfo "Mobile "$1" port "$2" found."
+		return 0
+	}
+	logInfo "Mobile "$1" port "$2" not found."
+	return 1
 }
 
-# Check LOCAL_BACKUP_TARGET_BASE_DIR
-[ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
-        echo "-> Local backup target base folder not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
-        mkdir -p ${LOCAL_BACKUP_TARGET_BASE_DIR}
-        RET_VAL=$?
-        [ $RET_VAL -ne 0 ] {
-                echo "Error creating local  backup target base folder."
-                exit 1
-        }
-	echo "Local backup target base folder created."
+function logInfo() {
+	[ $DEBUG -eq 0 ] && return
+	echo "> ${1}"
 }
 
-
-
-
-[ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
-	echo "-> Local dir not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
-        exit 1
+function checkLocalMobileMountpointBase() {
+	[ -d ${LOCAL_MOBILE_MOUNTPOINT_BASE} ] || {
+        	logInfo "Local mobile mountpoint base folder not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
+	        mkdir -p ${LOCAL_MOBILE_MOUNTPOINT_BASE} >/dev/null 2>&1
+	        RET_VAL=$?
+	        [ $RET_VAL -ne 0 ] && {
+        	        echo "Error creating local mobile mountpoint base folder."
+                	exit 1
+	        }
+	        echo "Local local mobile mountpoint base folder ${LOCAL_MOBILE_MOUNTPOINT_BASE} created."
+	}
 }
 
-echo "-------------------------------------"
-echo "- Starting handy backup program...  -"
-echo "-------------------------------------"
+function checkLocalBackupTargetBaseDir() {
+	[ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
+	        logInfo "Local backup target base folder not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
+	        mkdir -p ${LOCAL_BACKUP_TARGET_BASE_DIR} >/dev/null 2>&1
+	        RET_VAL=$?
+	        [ $RET_VAL -ne 0 ] && {
+	                echo "Error creating local backup target base folder ${LOCAL_BACKUP_TARGET_BASE_DIR}."
+	                exit 1
+	        }
+	        echo "Local backup target base folder ${LOCAL_BACKUP_TARGET_BASE_DIR} created."
+	}
+}
 
-echo "-> Trying to mount handy filesystem..."
-set +e
-df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
-REMOTE_IS_ALREADY_MOUNTED=$?
-set -e
-if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
-  curlftpfs -o ssl,no_verify_hostname,no_verify_peer,user=${REMOTE_FTPS_USER}:${REMOTE_FTPS_USER_PASS} ftps://${REMOTE_FTPS_HOST}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 
-  echo "-> Handy mounted."
-else
-  echo "-> Handy is already mounted."
-fi
+function doBackup() {
+	logInfo "Starting doBackup"
+}
 
-cd ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+function mountMobile() {
+	logInfo "Trying to mount mobile."
+	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
+	REMOTE_IS_ALREADY_MOUNTED=$?
+	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
+		set -e
+		curlftpfs -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+		set +e
+		logInfo "Mobile mounted."
+		return 0
+	else
+		logInfo "Mobile is already mounted."
+		return 1
+	fi
+}
 
-set +e
-#-------------Copy Folders START-------------------#
-echo "-> Syncing DCIM/Camera..."
-${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing DCIM/Screenshots..."
-${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing Pictures..."
-${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing Movies..."
-${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing Music..."
-${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing Telegram..."
-${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing WhatsApp..."
-${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#--------------------------------------------------#
-echo "-> Syncing Signal..."
-${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#-------------Copy Folders END---------------------#
-set -e
+function doBackup() {
+	mountMobile
+	cd ${LOCAL_MOBILE_MOUNTPOINT_BASE}
 
-cd - 2>&1 >/dev/null
-echo "-> Unmounting handy filesystem..."
-fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 
+#	set +e
+	#-------------Copy Folders START-------------------#
+#	logInfo  "Syncing DCIM/Camera..."
+#	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+#	logInfo  "Syncing DCIM/Screenshots..."
+#	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+#	logInfo  "Syncing Pictures..."
+#	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+#	logInfo  "Syncing Movies..."
+#	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+	logInfo  "Syncing Music..."
+	${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+#	logInfo  "Syncing Telegram..."
+#	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+#	logInfo  "Syncing WhatsApp..."
+#	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#--------------------------------------------------#
+#	logInfo  "Syncing Signal..."
+#	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	#-------------Copy Folders END---------------------#
+#	set -e
 
-echo "-> Backup done."
+	cd - 2>&1 >/dev/null
+	logInfo  "Unmounting mobile filesystem..."
+	sleep ${SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH}
+	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+	RET_VAL=$?
+	[ $RET_VAL -ne 0 ] && {
+		logInfo "Error unmounting mobile."
+		return
+	}
+	logInfo "Mobile unmounted."
+}
+
+#
+# MAIN
+#
+
+checkLocalMobileMountpointBase
+checkLocalBackupTargetBaseDir
+
+while true;do
+	checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
+	RET_VAL=$?
+	while [ $RET_VAL -ne 0 ];do
+		logInfo "Host not found, sleeping..."
+		sleep ${SEARCH_MOBILE_INTERVAL_SEC}
+		checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
+		RET_VAL=$?
+	done
+	logInfo "Server found."
+	doBackup
+	logInfo "Backup done. Sleeping..."
+	[ "$RUN_AS_DAEMON" -eq 0 ] && {
+		logInfo "Not running in daemon mode. Exiting."
+		exit 0
+	}	
+	logInfo "Sleeping ${BACKUP_INTERVAL_SEC} seconds before next backup."
+	sleep ${BACKUP_INTERVAL_SEC}
+done
+echo "Exiting airback."
+
+exit 0
+
 
