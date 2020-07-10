@@ -7,3 +7,13 @@ Written by
 
 You want to backup your handy pictures and videos to ypur linux server?
 Use airback and it will start backing up your data when your mobile appears in your wifi network.
+
+Please send feedback
+
+Dependencies
+nmap
+fusermount
+curlftpfs
+
+
+Wifi FTP Server
