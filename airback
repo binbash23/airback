@@ -145,7 +145,8 @@ function createDefaultConfigFile() {
 		echo "Creating root folder: ${AIRBACK_ROOT_DIR}"
 		mkdir -p ${AIRBACK_ROOT_DIR}
 	}
-	logInfo "Creating default conf file..."
+	echo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
+	echo "Edit config file for your needs and restart airback."
 echo '
 #
 # airback.conf
@@ -176,6 +177,7 @@ SEARCH_MOBILE_INTERVAL_SEC=5
 BACKUP_INTERVAL_SEC=600
 SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH=3
 ' > ${AIRBACK_CONFIG_FILE}	
+	exit 0
 }
 
 #function checkDependencies() {
