@@ -139,6 +139,49 @@ function doBackup() {
 	logInfo "Mobile unmounted."
 }
 
+function createDefaultConfigFile() {
+	[ -d ${AIRBACK_ROOT_DIR} ] || {
+		logInfo "Root folder not found."
+		echo "Creating root folder: ${AIRBACK_ROOT_DIR}"
+		mkdir -p ${AIRBACK_ROOT_DIR}
+	}
+	logInfo "Creating default conf file..."
+echo '
+#
+# airback.conf
+#
+# 20200709 jens heine <binbash@gmx.net>
+#          Dennis Brossat <dennis.brossat@email.de>
+#          Benjamin Heine <benjaminheine@gmx.net>
+#
+# Configuration file for airback - backup your mobile device over wifi
+#
+
+# Local folder where remote device will be mounted
+LOCAL_MOBILE_MOUNTPOINT_BASE="${AIRBACK_ROOT_DIR}/mnt"
+# Local folder where remote files will be saved
+LOCAL_BACKUP_TARGET_BASE_DIR="${AIRBACK_ROOT_DIR}/backup"
+# Remote access configuration
+# Note: Enable implicit ssl mode on server
+# REMOTE_FTPS_HOST="IP:PORT"
+MOBILE_HOST="192.168.1.21"
+MOBILE_PORT="10000"
+MOBILE_USER="ftpuser"
+MOBILE_USER_PASS="pass"
+# Run airback as a daemon who polls for the mobile
+RUN_AS_DAEMON=1
+# Polling interval to find the mobile in seconds
+SEARCH_MOBILE_INTERVAL_SEC=5
+# Interval for doing backups
+BACKUP_INTERVAL_SEC=600
+SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH=3
+' > ${AIRBACK_CONFIG_FILE}	
+}
+
+#function checkDependencies() {
+#	[ -x 
+#}
+
 #
 # MAIN
 #
@@ -146,8 +189,9 @@ function doBackup() {
 # Check and source config file
 [ -r ${AIRBACK_CONFIG_FILE} ] || {
 	echo "Error config file not found: ${AIRBACK_CONFIG_FILE}"
-	exit 1
+	createDefaultConfigFile
 }
+
 . ${AIRBACK_CONFIG_FILE}
 
 checkLocalMobileMountpointBase
