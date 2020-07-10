@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# 20200404 jens heine
-# 20200413 jens heine: FTPS mode enabled
-# 20200710 jens heine <binbash@gmx.net>
-#          benjamin heine
-#          dennis brossat
+# 20200404 Jens Heine
+# 20200413 Jens Heine: FTPS mode enabled
+# 20200710 Jens Heine <binbash@gmx.net>
+#          Dennis Brossat <dennis.brossat@email.de>
+#          Benjamin Heine <benjaminheine@gmx.net>
 #
 # airback - backup your mobile device over wifi
 #
