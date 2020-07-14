@@ -15,7 +15,7 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="202007100247"
+VERSION="20200714"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG=1
@@ -23,6 +23,24 @@ REMOTE_IS_ALREADY_MOUNTED=0
 VERBOSITY="v"
 RSYNC_CMD="nice -n 20 rsync -${VERBOSITY}rultR --chmod=774"
 NMAP_CMD="nice -n 20 nmap "
+USAGE_INFO_TEXT="
+
+        airback by Jens Heine <binbash@gmx.net> 2020
+                   and Dennis Brossat <dennis.brossat@email.de>
+                   and Benjamin Heine <benjaminheine@gmx.net>
+
+USAGE
+
+        airback OPTIONS
+
+OPTIONS
+        -c Show config file
+        -d Show debug infos
+        -h Show usage information
+        -v Show program version
+
+"
+
 
 #
 # FUNCTIONS
@@ -180,13 +198,92 @@ SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH=3
 	exit 0
 }
 
-#function checkDependencies() {
-#	[ -x 
-#}
+function checkForCommand() {
+	[ ! "${1}" ] && {
+		logInfo "Error: no command given to check."
+		return 0
+	}
+	logInfo "Checking if ${1} is installed."
+        which "${1}" >/dev/null 2>&1
+        RET_VAL=$?
+        [ "$RET_VAL" -ne 0 ] && {
+                echo "Error: ${1} not found." 1>&2
+                echo "Please install ${1}. For example: apt-get install ${1}" 1>&2
+		return 1
+        }
+	logInfo "Success: command ${1} is installed."
+	return 0
+}
+
+#
+# check if all needed tools are available
+#
+function checkDependencies() {
+	DEPENDENCY_ERRORS=0
+	logInfo "Checking dependencies..."
+
+	checkForCommand "rsync"
+	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
+	checkForCommand "nice"
+	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
+	checkForCommand "nmap"
+	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
+	checkForCommand "curlftpfs"
+	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
+
+	[ $DEPENDENCY_ERRORS -eq 0 ] && {
+		logInfo "Dependency check OK."
+		return 0
+	} 
+	logInfo "Dependency check had errors."
+	return 1
+}
+
+function showUsage() {
+	echo "$USAGE_INFO_TEXT"
+}
+
+function showVerionInfo() {
+	echo
+	echo "airback version: $VERSION"
+	echo
+}
+
+function showConfigFile() {
+	echo 
+	echo "airback configuration file"
+	echo "File: ${AIRBACK_CONFIG_FILE}"
+	echo
+	cat ${AIRBACK_CONFIG_FILE}
+}
 
 #
 # MAIN
 #
+
+while getopts "cdhv" options;do
+	case "$options" in
+		c) showConfigFile
+		   exit 0
+		   ;;
+		d) DEBUG=1
+		   ;;
+		h) showUsage
+		   exit 0
+		   ;;
+		v) showVerionInfo
+		   exit 0
+		   ;;
+		*) showUsage
+		   exit 0
+		   ;;
+	esac
+done
+
+checkDependencies || {
+	echo "Missing dependecies. Please install the missing commands and restart."
+	exit 1
+}
 
 # Check and source config file
 [ -r ${AIRBACK_CONFIG_FILE} ] || {
