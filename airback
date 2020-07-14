@@ -66,7 +66,7 @@ checkForRunningPortServer() {
 
 function logInfo() {
 	[ $DEBUG -eq 0 ] && return
-	echo "> ${1}"
+	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}"
 }
 
 function checkLocalMobileMountpointBase() {
@@ -95,10 +95,6 @@ function checkLocalBackupTargetBaseDir() {
 	}
 }
 
-function doBackup() {
-	logInfo "Starting doBackup"
-}
-
 function mountMobile() {
 	logInfo "Trying to mount mobile."
 	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
@@ -121,29 +117,29 @@ function doBackup() {
 
 #	set +e
 	#-------------Copy Folders START-------------------#
-#	logInfo  "Syncing DCIM/Camera..."
-#	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing DCIM/Camera..."
+	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-#	logInfo  "Syncing DCIM/Screenshots..."
-#	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing DCIM/Screenshots..."
+	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-#	logInfo  "Syncing Pictures..."
-#	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing Pictures..."
+	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-#	logInfo  "Syncing Movies..."
-#	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing Movies..."
+	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
 	logInfo  "Syncing Music..."
 	${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-#	logInfo  "Syncing Telegram..."
-#	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing Telegram..."
+	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-#	logInfo  "Syncing WhatsApp..."
-#	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing WhatsApp..."
+	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-#	logInfo  "Syncing Signal..."
-#	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
+	logInfo  "Syncing Signal..."
+	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#-------------Copy Folders END---------------------#
 #	set -e
 
@@ -166,7 +162,6 @@ function createDefaultConfigFile() {
 		mkdir -p ${AIRBACK_ROOT_DIR}
 	}
 	echo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
-	echo "Edit config file for your needs and restart airback."
 echo '
 #
 # airback.conf
@@ -184,20 +179,18 @@ LOCAL_MOBILE_MOUNTPOINT_BASE="${AIRBACK_ROOT_DIR}/mnt"
 LOCAL_BACKUP_TARGET_BASE_DIR="${AIRBACK_ROOT_DIR}/backup"
 # Remote access configuration
 # Note: Enable implicit ssl mode on server
-# REMOTE_FTPS_HOST="IP:PORT"
 MOBILE_HOST="192.168.1.21"
 MOBILE_PORT="10000"
 MOBILE_USER="ftpuser"
 MOBILE_USER_PASS="pass"
 # Run airback as a daemon who polls for the mobile
-RUN_AS_DAEMON=1
+RUN_AS_DAEMON="1"
 # Polling interval to find the mobile in seconds
-SEARCH_MOBILE_INTERVAL_SEC=5
+SEARCH_MOBILE_INTERVAL_SEC="5"
 # Interval for doing backups
-BACKUP_INTERVAL_SEC=600
-SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH=3
+BACKUP_INTERVAL_SEC="600"
+SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH="3"
 ' > ${AIRBACK_CONFIG_FILE}	
-	exit 0
 }
 
 function checkForCommand() {
@@ -253,8 +246,8 @@ function showVersionInfo() {
 
 function showConfigFile() {
 	echo 
-	echo "airback configuration file"
-	echo "File: ${AIRBACK_CONFIG_FILE}"
+	echo " Print airback configuration file"
+	echo " Filename: ${AIRBACK_CONFIG_FILE}"
 	echo
 	cat ${AIRBACK_CONFIG_FILE}
 }
@@ -272,20 +265,100 @@ function setVariableInConfigFile() {
 	logInfo "Setting new value for variable in config file:"
 	logInfo "Variable : ${1}"
 	logInfo "Value    : ${2}"
-	SED_PARAM="s/${1}=.*$/${1}=\"${2}\"/g"
+#	SED_PARAM="s/${1}=.*$/${1}=\"${LOCAL_VALUE}\"/g"
+#	SED_PARAM="s#${1}=.*$#${1}=\"${2}\"#g"
+	SED_PARAM="s#${1}=.*#${1}=${2}#g"
+	logInfo "SED_PARAM=$SED_PARAM"
 	sed -i "$SED_PARAM" ${AIRBACK_CONFIG_FILE}
 	RET_VAL=$?
 	if [ "$RET_VAL" -eq 0 ];then
 		logInfo "Variable ${1} set to ${2} in configfile ${AIRBACK_CONFIG_FILE}."
+		return 0
 	else
 		echo "Error setting variable ${1} to ${2} in configfile ${AIRBACK_CONFIG_FILE}." 1>&2
+		return 1
 	fi
 }
 
+function setVariablesInConfigFileFromUserInput() {
+	echo
+	echo " Please set the variables for your config file."
+	echo
+	read -p " Enter the IP of your mobile                               : " U_MOBILE_HOST
+	read -p " Enter the port mobile ftp service                         : " U_MOBILE_PORT
+	read -p " Enter the ftp username                                    : " U_MOBILE_USER
+	read -sp " Enter the ftp password                                    : " U_MOBILE_USER_PASS
+	echo
+	echo    " Enter the local path where your mobile filesystem"
+        read -p "  will be mounted to (it will be created if needed)        : " U_LOCAL_MOBILE_MOUNTPOINT_BASE
+	echo    " Enter the local path where the files from your mobile"
+        read -p "  will be written to (it will be created if needed)        : " U_LOCAL_BACKUP_TARGET_BASE_DIR
+	echo    " Should airback run in deamon mode? (0 or 1 default is 1)"
+	echo    "  If set to 1 airback will periodically check if your"
+        read -p "  mobile is reachable in the network                       : " U_RUN_AS_DAEMON
+	read -p " Set interval in s to search for your mobile (default 30)  : " U_SEARCH_MOBILE_INTERVAL_SEC
+	read -p " Set backup interval in s  (default 600)                   : " U_BACKUP_INTERVAL_SEC
+	echo
+	# set default values
+	U_RUN_AS_DAEMON=${U_RUN_AS_DAEMON:-1}
+	U_SEARCH_MOBILE_INTERVAL_SEC=${U_SEARCH_MOBILE_INTERVAL_SEC:-30}
+	U_BACKUP_INTERVAL_SEC=${U_BACKUP_INTERVAL_SEC:-600}
+	logInfo "U_MOBILE_HOST                  : $U_MOBILE_HOST"
+	logInfo "U_MOBILE_PORT                  : $U_MOBILE_PORT"
+	logInfo "U_MOBILE_USER                  : $U_MOBILE_USER"
+	logInfo "U_MOBILE_USER_PASS             : $U_MOBILE_USER_PASS"
+	logInfo "U_LOCAL_MOBILE_MOUNTPOINT_BASE : $U_LOCAL_MOBILE_MOUNTPOINT_BASE"
+	logInfo "U_LOCAL_BACKUP_TARGET_BASE_DIR : $U_LOCAL_BACKUP_TARGET_BASE_DIR"
+	logInfo "U_RUN_AS_DAEMON                : $U_RUN_AS_DAEMON"
+	logInfo "U_SEARCH_MOBILE_INTERVAL_SEC   : $U_SEARCH_MOBILE_INTERVAL_SEC"
+	logInfo "U_BACKUP_INTERVAL_SEC          : $U_BACKUP_INTERVAL_SEC"
+	[ ! "$U_MOBILE_HOST" -o ! "$U_MOBILE_PORT" -o ! "$U_MOBILE_USER" \
+ 	  -o ! "$U_MOBILE_USER_PASS" -o ! "$U_LOCAL_MOBILE_MOUNTPOINT_BASE" \
+	  -o ! "$U_LOCAL_BACKUP_TARGET_BASE_DIR" -o ! "$U_RUN_AS_DAEMON" \
+	  -o ! "$U_SEARCH_MOBILE_INTERVAL_SEC" \
+	  -o ! "$U_BACKUP_INTERVAL_SEC" ] && {
+		echo "Error: Variables must not be empty." 1>&2
+		return 1
+	}
+	logInfo "Setting variables and writing config file..."
+	CONFIG_FILE_ERRORS=0
+	setVariableInConfigFile "MOBILE_HOST" "${U_MOBILE_HOST}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "MOBILE_PORT" "${U_MOBILE_PORT}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "MOBILE_USER" "${U_MOBILE_USER}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "MOBILE_USER_PASS" "${U_MOBILE_USER_PASS}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "LOCAL_MOBILE_MOUNTPOINT_BASE" "${U_LOCAL_MOBILE_MOUNTPOINT_BASE}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "LOCAL_BACKUP_TARGET_BASE_DIR" "${U_LOCAL_BACKUP_TARGET_BASE_DIR}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "RUN_AS_DAEMON" "${U_RUN_AS_DAEMON}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "SEARCH_MOBILE_INTERVAL_SEC" "${U_SEARCH_MOBILE_INTERVAL_SEC}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "BACKUP_INTERVAL_SEC" "${U_BACKUP_INTERVAL_SEC}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	[ $CONFIG_FILE_ERRORS -eq 0 ] && {
+		logInfo "Setting variables done."
+		return 0
+        }
+	logInfo "Setting variables done with errors." 
+	logInfo "Please check config file manually." 
+	return 1
+}
+
+
+###################################################################################################
 #
 # MAIN
 #
+###################################################################################################
 
+#
+# Evaluate arguments
+#
 ACTION=""
 while getopts "cdhS:vV:" options;do
 	case "$options" in
@@ -312,6 +385,9 @@ while getopts "cdhS:vV:" options;do
 	esac
 done
 
+#
+# Process actions
+#
 if [ "$ACTION" = "SET_VARIABLE_IN_CONFIG" ];then
 	echo
 	logInfo "Set variable in config file"
@@ -333,27 +409,45 @@ if [ "$ACTION" = "SET_VARIABLE_IN_CONFIG" ];then
 	exit 0
 fi
 
+#
+# Check dependencies
+#
 checkDependencies || {
 	echo "Missing dependecies. Please install the missing commands and restart."
 	exit 1
 }
 
+#
 # Check and source config file
+#
 [ -r ${AIRBACK_CONFIG_FILE} ] || {
 	echo "Error config file not found: ${AIRBACK_CONFIG_FILE}"
 	createDefaultConfigFile
+	setVariablesInConfigFileFromUserInput || {
+		echo "Error: check config file manually: ${AIRBACK_CONFIG_FILE}" 1>&2
+		exit
+	}
 }
 
+# Load config file
 . ${AIRBACK_CONFIG_FILE}
 
+#
+# Check paths
+#
 checkLocalMobileMountpointBase
 checkLocalBackupTargetBaseDir
 
+#
+# Go
+#
+echo "Starting airback..."
+echo "Exit with <strg>C"
 while true;do
 	checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
 	RET_VAL=$?
 	while [ $RET_VAL -ne 0 ];do
-		logInfo "Host not found, sleeping..."
+		logInfo "Host not found, sleeping ${SEARCH_MOBILE_INTERVAL_SEC} seconds..."
 		sleep ${SEARCH_MOBILE_INTERVAL_SEC}
 		checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
 		RET_VAL=$?
