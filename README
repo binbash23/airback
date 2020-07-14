@@ -9,12 +9,25 @@ You want to backup your handy pictures and videos to ypur linux server?
 Use airback and it will start backing up your data when your mobile appears in your wifi network.
 
 
+HOWTO
+
 Dependencies
-nmap
-fusermount
-curlftpfs
+
+First install this tools on your system:
+ nmap
+ fusermount
+ curlftpfs
+ nice
 
 
-Wifi FTP Server
+Then install a FTP server on your mobile. I use "WIFI FTP Server" on my android.
+
+Configure and start the ftp server when you want backup be done:
+- Set a ftp port number
+- Set a username and password
+- Set mode to "FTP over TLS/SSL"
+- Set SSL mode to "implicit"
+- Set root folder to "internal memory"
+- Set mode to "readonly"
 
 Please send feedback
