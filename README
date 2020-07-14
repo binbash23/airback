@@ -30,5 +30,12 @@ Configure and start the ftp server when you want backup be done:
 - Set root folder to "internal memory"
 - Set mode to "readonly"
 
+Download airback and copy it to a folder in your path.
+Run airback:
+
+"airback -h" for help
+or
+"airback" to run it. A config file will be created.
+
 Please send feedback
 Good luck, Jens
