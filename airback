@@ -18,7 +18,7 @@
 VERSION="20200714"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
-DEBUG=1
+DEBUG=0
 REMOTE_IS_ALREADY_MOUNTED=0
 VERBOSITY="v"
 RSYNC_CMD="nice -n 20 rsync -${VERBOSITY}rultR --chmod=774"
@@ -34,10 +34,12 @@ USAGE
         airback OPTIONS
 
 OPTIONS
-        -c Show config file
-        -d Show debug infos
-        -h Show usage information
-        -v Show program version
+        -c            : Show config file
+        -d            : Show debug infos
+        -h            : Show usage information
+	-S [VARIABLE] : set VARIABLE to set in config file (use together with -V)
+	-V [VALUE]    : set VALUE to set variable to value in config file (use together with -S)
+        -v            : Show program version
 
 "
 
@@ -243,7 +245,7 @@ function showUsage() {
 	echo "$USAGE_INFO_TEXT"
 }
 
-function showVerionInfo() {
+function showVersionInfo() {
 	echo
 	echo "airback version: $VERSION"
 	echo
@@ -257,11 +259,35 @@ function showConfigFile() {
 	cat ${AIRBACK_CONFIG_FILE}
 }
 
+function setVariableInConfigFile() {
+        [ ! "${1}" ] && {
+                logInfo "Error: Variable name missing."
+                return 1
+        }
+        [ ! "${2}" ] && {
+                logInfo "Error: Value for variable missing."
+                return 1
+        }
+
+	logInfo "Setting new value for variable in config file:"
+	logInfo "Variable : ${1}"
+	logInfo "Value    : ${2}"
+	SED_PARAM="s/${1}=.*$/${1}=\"${2}\"/g"
+	sed -i "$SED_PARAM" ${AIRBACK_CONFIG_FILE}
+	RET_VAL=$?
+	if [ "$RET_VAL" -eq 0 ];then
+		logInfo "Variable ${1} set to ${2} in configfile ${AIRBACK_CONFIG_FILE}."
+	else
+		echo "Error setting variable ${1} to ${2} in configfile ${AIRBACK_CONFIG_FILE}." 1>&2
+	fi
+}
+
 #
 # MAIN
 #
 
-while getopts "cdhv" options;do
+ACTION=""
+while getopts "cdhS:vV:" options;do
 	case "$options" in
 		c) showConfigFile
 		   exit 0
@@ -271,7 +297,13 @@ while getopts "cdhv" options;do
 		h) showUsage
 		   exit 0
 		   ;;
-		v) showVerionInfo
+		S) ACTION="SET_VARIABLE_IN_CONFIG"
+		   VAR_NAME=${OPTARG}
+		   ;;
+		V) ACTION="SET_VARIABLE_IN_CONFIG"
+		   VAR_VALUE=${OPTARG}
+		   ;;
+		v) showVersionInfo
 		   exit 0
 		   ;;
 		*) showUsage
@@ -279,6 +311,27 @@ while getopts "cdhv" options;do
 		   ;;
 	esac
 done
+
+if [ "$ACTION" = "SET_VARIABLE_IN_CONFIG" ];then
+	echo
+	logInfo "Set variable in config file"
+	[ ! "$VAR_NAME" -o ! "$VAR_VALUE" ] && {
+		echo "Error: Variable name or value missing." 1>&2
+		echo
+		echo "Try -h for help."
+		echo
+		exit 1
+	}
+	setVariableInConfigFile "${VAR_NAME}" "${VAR_VALUE}"
+	RET_VAL=$?
+	[ "$RET_VAL" -ne 0 ] && {
+		echo "Error setting ${VAR_NAME} set to ${VAR_VALUE}." 1>&2
+		exit 1
+	}
+	echo "Variable ${VAR_NAME} set to ${VAR_VALUE}"
+	echo
+	exit 0
+fi
 
 checkDependencies || {
 	echo "Missing dependecies. Please install the missing commands and restart."
