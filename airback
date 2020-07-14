@@ -20,7 +20,7 @@ AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG=0
 REMOTE_IS_ALREADY_MOUNTED=0
-VERBOSITY="v"
+VERBOSITY=""
 RSYNC_CMD="nice -n 20 rsync -${VERBOSITY}rultR --chmod=774"
 NMAP_CMD="nice -n 20 nmap "
 USAGE_INFO_TEXT="
@@ -49,122 +49,129 @@ OPTIONS
 #
 # Args: IP PORT
 checkForRunningPortServer() {
-	logInfo "Checking for mobile..."
+	logDebug "Checking for mobile..."
 	[ "$1" -a "$2" ] || {
-		echo "Host or port missing."
+		logInfo "Host or port missing."
 		exit 1
 	}
 	${NMAP_CMD} ${1} -p ${2} | grep "open" >/dev/null 2>&1
 	RET_VAL=$?
 	[ "${RET_VAL}" -eq 0 ] && {
-		logInfo "Mobile "$1" port "$2" found."
+		logDebug "Mobile "$1" port "$2" found."
 		return 0
 	}
-	logInfo "Mobile "$1" port "$2" not found."
+	logDebug "Mobile "$1" port "$2" not found."
 	return 1
 }
 
 function logInfo() {
+	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}"
+}
+
+function logDebug() {
 	[ $DEBUG -eq 0 ] && return
 	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}"
 }
 
 function checkLocalMobileMountpointBase() {
 	[ -d ${LOCAL_MOBILE_MOUNTPOINT_BASE} ] || {
-        	logInfo "Local mobile mountpoint base folder not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
+        	logDebug "Local mobile mountpoint base folder not found: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
 	        mkdir -p ${LOCAL_MOBILE_MOUNTPOINT_BASE} >/dev/null 2>&1
 	        RET_VAL=$?
 	        [ $RET_VAL -ne 0 ] && {
-        	        echo "Error creating local mobile mountpoint base folder."
+        	        logInfo "Error creating local mobile mountpoint base folder."
                 	exit 1
 	        }
-	        echo "Local local mobile mountpoint base folder ${LOCAL_MOBILE_MOUNTPOINT_BASE} created."
+	        logInfo "Local local mobile mountpoint base folder ${LOCAL_MOBILE_MOUNTPOINT_BASE} created."
 	}
 }
 
 function checkLocalBackupTargetBaseDir() {
 	[ -d ${LOCAL_BACKUP_TARGET_BASE_DIR} ] || {
-	        logInfo "Local backup target base folder not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
+	        logDebug "Local backup target base folder not found: ${LOCAL_BACKUP_TARGET_BASE_DIR}"
 	        mkdir -p ${LOCAL_BACKUP_TARGET_BASE_DIR} >/dev/null 2>&1
 	        RET_VAL=$?
 	        [ $RET_VAL -ne 0 ] && {
-	                echo "Error creating local backup target base folder ${LOCAL_BACKUP_TARGET_BASE_DIR}."
+	                logInfo "Error creating local backup target base folder ${LOCAL_BACKUP_TARGET_BASE_DIR}."
 	                exit 1
 	        }
-	        echo "Local backup target base folder ${LOCAL_BACKUP_TARGET_BASE_DIR} created."
+	        logInfo "Local backup target base folder ${LOCAL_BACKUP_TARGET_BASE_DIR} created."
 	}
 }
 
 function mountMobile() {
-	logInfo "Trying to mount mobile."
+	logDebug "Trying to mount mobile."
 	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
 	REMOTE_IS_ALREADY_MOUNTED=$?
 	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
-		set -e
 		curlftpfs -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE}
-		set +e
-		logInfo "Mobile mounted."
+		RET_VAL=$?
+		[ "$RET_VAL" -ne 0 ] && {
+			logDebug "Mobile could not be mounted."
+			return 1
+		}
+		logDebug "Mobile mounted."
 		return 0
 	else
-		logInfo "Mobile is already mounted."
+		logDebug "Mobile is already mounted."
 		return 0
 	fi
 }
 
 function doBackup() {
 	mountMobile || {
-		echo "Error: mounting mobile failed."
+		logInfo "Error: mounting mobile failed."
 		return 1
 	}
 	cd ${LOCAL_MOBILE_MOUNTPOINT_BASE}
 
 #	set +e
 	#-------------Copy Folders START-------------------#
-	logInfo  "Syncing DCIM/Camera..."
+	logDebug  "Syncing DCIM/Camera..."
 	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing DCIM/Screenshots..."
+	logDebug  "Syncing DCIM/Screenshots..."
 	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing Pictures..."
+	logDebug  "Syncing Pictures..."
 	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing Movies..."
+	logDebug  "Syncing Movies..."
 	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing Music..."
+	logDebug  "Syncing Music..."
 	${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing Telegram..."
+	logDebug  "Syncing Telegram..."
 	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing WhatsApp..."
+	logDebug  "Syncing WhatsApp..."
 	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#--------------------------------------------------#
-	logInfo  "Syncing Signal..."
+	logDebug  "Syncing Signal..."
 	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#-------------Copy Folders END---------------------#
 #	set -e
 
 	cd - 2>&1 >/dev/null
-	logInfo  "Unmounting mobile filesystem..."
+	logDebug  "Unmounting mobile filesystem..."
 	sleep ${SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH}
 	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE}
 	RET_VAL=$?
 	[ $RET_VAL -ne 0 ] && {
-		logInfo "Error unmounting mobile."
+		logDebug "Error unmounting mobile."
 		return
 	}
-	logInfo "Mobile unmounted."
+	logDebug "Mobile unmounted."
 }
 
 function createDefaultConfigFile() {
 	[ -d ${AIRBACK_ROOT_DIR} ] || {
-		logInfo "Root folder not found."
-		echo "Creating root folder: ${AIRBACK_ROOT_DIR}"
+		logDebug "Root folder not found."
+		logInfo "Creating root folder: ${AIRBACK_ROOT_DIR}"
 		mkdir -p ${AIRBACK_ROOT_DIR}
 	}
-	echo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
+	logInfo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
 echo '
 #
 # airback.conf
@@ -198,18 +205,18 @@ SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH="3"
 
 function checkForCommand() {
 	[ ! "${1}" ] && {
-		logInfo "Error: no command given to check."
+		logDebug "Error: no command given to check."
 		return 0
 	}
-	logInfo "Checking if ${1} is installed."
+	logDebug "Checking if ${1} is installed."
         which "${1}" >/dev/null 2>&1
         RET_VAL=$?
         [ "$RET_VAL" -ne 0 ] && {
-                echo "Error: ${1} not found." 1>&2
-                echo "Please install ${1}. For example: apt-get install ${1}" 1>&2
+                logInfo "Error: ${1} not found." 
+                logInfo "Please install ${1}. For example: apt-get install ${1}" 
 		return 1
         }
-	logInfo "Success: command ${1} is installed."
+	logDebug "Success: command ${1} is installed."
 	return 0
 }
 
@@ -218,7 +225,7 @@ function checkForCommand() {
 #
 function checkDependencies() {
 	DEPENDENCY_ERRORS=0
-	logInfo "Checking dependencies..."
+	logDebug "Checking dependencies..."
 
 	checkForCommand "rsync"
 	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
@@ -230,10 +237,10 @@ function checkDependencies() {
 	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
 
 	[ $DEPENDENCY_ERRORS -eq 0 ] && {
-		logInfo "Dependency check OK."
+		logDebug "Dependency check OK."
 		return 0
 	} 
-	logInfo "Dependency check had errors."
+	logDebug "Dependency check had errors."
 	return 1
 }
 
@@ -257,26 +264,31 @@ function showConfigFile() {
 
 function setVariableInConfigFile() {
         [ ! "${1}" ] && {
-                logInfo "Error: Variable name missing."
+                logDebug "Error: Variable name missing."
                 return 1
         }
         [ ! "${2}" ] && {
-                logInfo "Error: Value for variable missing."
+                logDebug "Error: Value for variable missing."
                 return 1
         }
-
-	logInfo "Setting new value for variable in config file:"
-	logInfo "Variable : ${1}"
-	logInfo "Value    : ${2}"
+	grep "${1}" "${AIRBACK_CONFIG_FILE}" >/dev/null 2>&1
+	RET_VAL=$?
+	[ "$RET_VAL" -ne 0 ] && {
+		logDebug "ERROR: Variable ${1} not found in configfile ${AIRBACK_CONFIG_FILE}"
+		return 1
+	}
+	logDebug "Setting new value for variable in config file:"
+	logDebug "Variable : ${1}"
+	logDebug "Value    : ${2}"
 	SED_PARAM="s#${1}=.*#${1}=${2}#g"
-	logInfo "SED_PARAM=$SED_PARAM"
+	logDebug "SED_PARAM=$SED_PARAM"
 	sed -i "$SED_PARAM" ${AIRBACK_CONFIG_FILE}
 	RET_VAL=$?
 	if [ "$RET_VAL" -eq 0 ];then
-		logInfo "Variable ${1} set to ${2} in configfile ${AIRBACK_CONFIG_FILE}."
+		logDebug "Variable ${1} set to ${2} in configfile ${AIRBACK_CONFIG_FILE}."
 		return 0
 	else
-		echo "Error setting variable ${1} to ${2} in configfile ${AIRBACK_CONFIG_FILE}." 1>&2
+		logInfo "Error setting variable ${1} to ${2} in configfile ${AIRBACK_CONFIG_FILE}." 
 		return 1
 	fi
 }
@@ -304,24 +316,24 @@ function setVariablesInConfigFileFromUserInput() {
 	U_RUN_AS_DAEMON=${U_RUN_AS_DAEMON:-1}
 	U_SEARCH_MOBILE_INTERVAL_SEC=${U_SEARCH_MOBILE_INTERVAL_SEC:-30}
 	U_BACKUP_INTERVAL_SEC=${U_BACKUP_INTERVAL_SEC:-600}
-	logInfo "U_MOBILE_HOST                  : $U_MOBILE_HOST"
-	logInfo "U_MOBILE_PORT                  : $U_MOBILE_PORT"
-	logInfo "U_MOBILE_USER                  : $U_MOBILE_USER"
-	logInfo "U_MOBILE_USER_PASS             : $U_MOBILE_USER_PASS"
-	logInfo "U_LOCAL_MOBILE_MOUNTPOINT_BASE : $U_LOCAL_MOBILE_MOUNTPOINT_BASE"
-	logInfo "U_LOCAL_BACKUP_TARGET_BASE_DIR : $U_LOCAL_BACKUP_TARGET_BASE_DIR"
-	logInfo "U_RUN_AS_DAEMON                : $U_RUN_AS_DAEMON"
-	logInfo "U_SEARCH_MOBILE_INTERVAL_SEC   : $U_SEARCH_MOBILE_INTERVAL_SEC"
-	logInfo "U_BACKUP_INTERVAL_SEC          : $U_BACKUP_INTERVAL_SEC"
+	logDebug "U_MOBILE_HOST                  : $U_MOBILE_HOST"
+	logDebug "U_MOBILE_PORT                  : $U_MOBILE_PORT"
+	logDebug "U_MOBILE_USER                  : $U_MOBILE_USER"
+	logDebug "U_MOBILE_USER_PASS             : $U_MOBILE_USER_PASS"
+	logDebug "U_LOCAL_MOBILE_MOUNTPOINT_BASE : $U_LOCAL_MOBILE_MOUNTPOINT_BASE"
+	logDebug "U_LOCAL_BACKUP_TARGET_BASE_DIR : $U_LOCAL_BACKUP_TARGET_BASE_DIR"
+	logDebug "U_RUN_AS_DAEMON                : $U_RUN_AS_DAEMON"
+	logDebug "U_SEARCH_MOBILE_INTERVAL_SEC   : $U_SEARCH_MOBILE_INTERVAL_SEC"
+	logDebug "U_BACKUP_INTERVAL_SEC          : $U_BACKUP_INTERVAL_SEC"
 	[ ! "$U_MOBILE_HOST" -o ! "$U_MOBILE_PORT" -o ! "$U_MOBILE_USER" \
  	  -o ! "$U_MOBILE_USER_PASS" -o ! "$U_LOCAL_MOBILE_MOUNTPOINT_BASE" \
 	  -o ! "$U_LOCAL_BACKUP_TARGET_BASE_DIR" -o ! "$U_RUN_AS_DAEMON" \
 	  -o ! "$U_SEARCH_MOBILE_INTERVAL_SEC" \
 	  -o ! "$U_BACKUP_INTERVAL_SEC" ] && {
-		echo "Error: Variables must not be empty." 1>&2
+		logInfo "Error: Variables must not be empty." 
 		return 1
 	}
-	logInfo "Setting variables and writing config file..."
+	logDebug "Setting variables and writing config file..."
 	CONFIG_FILE_ERRORS=0
 	setVariableInConfigFile "MOBILE_HOST" "${U_MOBILE_HOST}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
@@ -342,11 +354,11 @@ function setVariablesInConfigFileFromUserInput() {
 	setVariableInConfigFile "BACKUP_INTERVAL_SEC" "${U_BACKUP_INTERVAL_SEC}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
 	[ $CONFIG_FILE_ERRORS -eq 0 ] && {
-		logInfo "Setting variables done."
+		logDebug "Setting variables done."
 		return 0
         }
-	logInfo "Setting variables done with errors." 
-	logInfo "Please check config file manually." 
+	logDebug "Setting variables done with errors." 
+	logDebug "Please check config file manually." 
 	return 1
 }
 
@@ -367,6 +379,8 @@ while getopts "cdhS:vV:" options;do
 		   exit 0
 		   ;;
 		d) DEBUG=1
+		   VERBOSITY="v"
+		   RSYNC_CMD="${RSYNC_CMD} -v"
 		   ;;
 		h) showUsage
 		   exit 0
@@ -391,9 +405,9 @@ done
 #
 if [ "$ACTION" = "SET_VARIABLE_IN_CONFIG" ];then
 	echo
-	logInfo "Set variable in config file"
+	logDebug "Set variable in config file"
 	[ ! "$VAR_NAME" -o ! "$VAR_VALUE" ] && {
-		echo "Error: Variable name or value missing." 1>&2
+		echo "Error: Variable name or value missing." 
 		echo
 		echo "Try -h for help."
 		echo
@@ -402,7 +416,8 @@ if [ "$ACTION" = "SET_VARIABLE_IN_CONFIG" ];then
 	setVariableInConfigFile "${VAR_NAME}" "${VAR_VALUE}"
 	RET_VAL=$?
 	[ "$RET_VAL" -ne 0 ] && {
-		echo "Error setting ${VAR_NAME} set to ${VAR_VALUE}." 1>&2
+		echo "Error setting ${VAR_NAME} set to ${VAR_VALUE}." 
+		echo
 		exit 1
 	}
 	echo "Variable ${VAR_NAME} set to ${VAR_VALUE}"
@@ -414,7 +429,7 @@ fi
 # Check dependencies
 #
 checkDependencies || {
-	echo "Missing dependecies. Please install the missing commands and restart."
+	logInfo "Missing dependecies. Please install the missing commands and restart."
 	exit 1
 }
 
@@ -422,10 +437,10 @@ checkDependencies || {
 # Check and source config file
 #
 [ -r ${AIRBACK_CONFIG_FILE} ] || {
-	echo "Error config file not found: ${AIRBACK_CONFIG_FILE}"
+	logInfo "Error config file not found: ${AIRBACK_CONFIG_FILE}"
 	createDefaultConfigFile
 	setVariablesInConfigFileFromUserInput || {
-		echo "Error: check config file manually: ${AIRBACK_CONFIG_FILE}" 1>&2
+		logInfo "Error: check config file manually: ${AIRBACK_CONFIG_FILE}" 
 		exit
 	}
 }
@@ -442,28 +457,29 @@ checkLocalBackupTargetBaseDir
 #
 # Go
 #
-echo "Starting airback..."
-echo "Exit with <strg>C"
+logInfo "Starting airback..."
+logInfo "Exit with <strg>C"
 while true;do
 	checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
 	RET_VAL=$?
 	while [ $RET_VAL -ne 0 ];do
-		logInfo "Host not found, sleeping ${SEARCH_MOBILE_INTERVAL_SEC} seconds..."
+		logDebug "Host not found, sleeping ${SEARCH_MOBILE_INTERVAL_SEC} seconds..."
 		sleep ${SEARCH_MOBILE_INTERVAL_SEC}
 		checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
 		RET_VAL=$?
 	done
-	logInfo "Server found."
-	doBackup && echo "Backup successful"
-	logInfo "Backup done. Sleeping..."
+	logDebug "Server found. Starting backup..."
+	logInfo "Mobile found. Backing up data..."
+	doBackup && logInfo "Backup successful"
+	logDebug "Backup done. Sleeping..."
 	[ "$RUN_AS_DAEMON" -eq 0 ] && {
-		logInfo "Not running in daemon mode. Exiting."
+		logDebug "Not running in daemon mode. Exiting."
 		exit 0
 	}	
-	logInfo "Sleeping ${BACKUP_INTERVAL_SEC} seconds before next backup."
+	logDebug "Sleeping ${BACKUP_INTERVAL_SEC} seconds before next backup."
 	sleep ${BACKUP_INTERVAL_SEC}
 done
-echo "Exiting airback."
+logInfo "Exiting airback."
 
 exit 0
 
