@@ -55,15 +55,12 @@ OPTIONS
 #
 
 function logInfo() {
-	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | tee -a ${LOGFILE}
+	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | cat | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) 
 }
 
 function logDebug() {
-	if [ "${DEBUG}" -eq 0 ];then 
-		echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && cat ${LOGFILE} )
-	else
-		[ ${USE_LOGFILE} -eq 1 ] && echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | tee -a ${LOGFILE}
-	fi
+	[ "${DEBUG}" -eq 0 ] && return
+	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | cat
 }
 
 # Args: IP PORT
@@ -135,7 +132,6 @@ function doBackup() {
 	}
 	cd ${LOCAL_MOBILE_MOUNTPOINT_BASE}
 
-#	set +e
 	#-------------Copy Folders START-------------------#
 	logDebug  "Syncing DCIM/Camera..."
 	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
@@ -161,7 +157,6 @@ function doBackup() {
 	logDebug  "Syncing Signal..."
 	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
 	#-------------Copy Folders END---------------------#
-#	set -e
 
 	cd - 2>&1 >/dev/null
 	logDebug  "Unmounting mobile filesystem..."
@@ -389,7 +384,7 @@ function setVariablesInConfigFileFromUserInput() {
 # Evaluate arguments
 #
 ACTION=""
-while getopts "cCdhnS:vV:" options;do
+while getopts "cCdDhnS:vV:" options;do
 	case "$options" in
 		c) showConfigFile
 		   exit 0
