@@ -54,13 +54,22 @@ OPTIONS
 # FUNCTIONS
 #
 
+function cleanUpAndExit() {
+	logInfo "STRG-C detected. Cleaning up..."
+	unmountMobile
+	logInfo "Exiting."
+	exit 0
+}
+
+trap cleanUpAndExit SIGINT
+
 function logInfo() {
-	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | cat
+	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 }
 
 function logDebug() {
 	[ "${DEBUG}" -eq 0 ] && return
-	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | cat
+	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 }
 
 # Args: IP PORT
@@ -106,12 +115,26 @@ function checkLocalBackupTargetBaseDir() {
 	}
 }
 
+function unmountMobile() {
+	logDebug "Trying to unmount mobile."
+	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
+	REMOTE_IS_ALREADY_MOUNTED=$?
+	if [ "$REMOTE_IS_ALREADY_MOUNTED" -eq 0 ];then
+		logDebug "Unmounting mobile..."
+		sleep ${SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH}
+		fusermount -z -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
+	else
+		logDebug "Mobile is not mounted."
+		return
+	fi
+}
+
 function mountMobile() {
 	logDebug "Trying to mount mobile."
 	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
 	REMOTE_IS_ALREADY_MOUNTED=$?
 	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
-		curlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+		curlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 		RET_VAL=$?
 		[ "$RET_VAL" -ne 0 ] && {
 			logDebug "Mobile could not be mounted."
@@ -137,7 +160,7 @@ function runRsync() {
 		return
 	}
 	logDebug "Syncing remote folder: ${REMOTE_DIR_TO_BACKUP} to ${LOCAL_BACKUP_TARGET_BASE_DIR}..."
-	${RSYNC_CMD} ${VERBOSITY} ${REMOTE_DIR_TO_BACKUP} ${LOCAL_BACKUP_TARGET_BASE_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+	${RSYNC_CMD} ${VERBOSITY} ${REMOTE_DIR_TO_BACKUP} ${LOCAL_BACKUP_TARGET_BASE_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 }
 
 function doBackup() {
@@ -156,36 +179,9 @@ function doBackup() {
 		runRsync "${FOLDER}"
 	done
 
-#	#-------------Copy Folders START-------------------#
-#	logDebug  "Syncing DCIM/Camera..."
-#	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing DCIM/Screenshots..."
-#	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing Pictures..."
-#	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing Movies..."
-#	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing Music..."
-#	${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing Telegram..."
-#	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing WhatsApp..."
-#	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#--------------------------------------------------#
-#	logDebug  "Syncing Signal..."
-#	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
-#	#-------------Copy Folders END---------------------#
-
 	cd - 2>&1 >/dev/null
 	logDebug  "Unmounting mobile filesystem..."
-	sleep ${SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH}
-	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+	unmountMobile	
 	RET_VAL=$?
 	[ $RET_VAL -ne 0 ] && {
 		logDebug "Error unmounting mobile."
@@ -198,13 +194,13 @@ function createDefaultConfigFile() {
 	[ -d ${AIRBACK_ROOT_DIR} ] || {
 		logDebug "Root folder not found."
 		logInfo "Creating root folder: ${AIRBACK_ROOT_DIR}"
-		mkdir -p ${AIRBACK_ROOT_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+		mkdir -p ${AIRBACK_ROOT_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 	}
 	[ -r ${AIRBACK_CONFIG_FILE} ] && {
 		logInfo "Found existing configfile: ${AIRBACK_CONFIG_FILE}"
 		BACKUP_CONFIG_FILE=${AIRBACK_CONFIG_FILE}_`date "+%Y%m%d%H%M%S"`
 		logInfo "Creating backup file: ${BACKUP_CONFIG_FILE}"
-		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 	}
 	logInfo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
 echo '
@@ -234,7 +230,7 @@ RUN_AS_DAEMON="1"
 SEARCH_MOBILE_INTERVAL_SEC="5"
 # Interval for doing backups
 BACKUP_INTERVAL_SEC="600"
-SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH="3"
+SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH="1"
 ' > ${AIRBACK_CONFIG_FILE}	
 }
 
@@ -408,7 +404,7 @@ function setVariablesInConfigFileFromUserInput() {
 # Evaluate arguments
 #
 ACTION=""
-while getopts "cCdDhnS:vV:" options;do
+while getopts "cCdDhnqS:vV:" options;do
 	case "$options" in
 		c) showConfigFile
 		   exit 0
@@ -519,7 +515,7 @@ checkLocalBackupTargetBaseDir
 # Go
 #
 logInfo "Starting airback..."
-logInfo "Exit with <strg>C"
+logInfo "Exit with STRG-C"
 while true;do
 	checkForRunningPortServer "$MOBILE_HOST" "$MOBILE_PORT"
 	RET_VAL=$?
