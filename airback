@@ -18,10 +18,11 @@
 VERSION="20200717"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
-DEBUG=0
+DEBUG="0"
 LOGFILE="${AIRBACK_ROOT_DIR}/airback.log"
-USE_LOGFILE=1
-REMOTE_IS_ALREADY_MOUNTED=0
+USE_LOGFILE="1"
+RUN_AS_DAEMON_OVERRIDE="0"
+REMOTE_IS_ALREADY_MOUNTED="0"
 VERBOSITY=""
 RSYNC_CMD="nice -n 20 rsync ${VERBOSITY} -rultR --chmod=774"
 NMAP_CMD="nice -n 20 nmap "
@@ -39,6 +40,7 @@ OPTIONS
         -c            : Show config file
         -C            : Create new config file with user input
         -d            : Show debug infos, be verbose
+	-D            : Run as daemon even if deactivated in config file
         -h            : Show usage information
 	-n            : Do not use logfile
 	-S [VARIABLE] : set VARIABLE to set in config file (use together with -V)
@@ -398,6 +400,8 @@ while getopts "cCdhnS:vV:" options;do
 		   VERBOSITY="v"
 		   RSYNC_CMD="${RSYNC_CMD} -v"
 		   ;;
+		D) RUN_AS_DAEMON_OVERRIDE=1
+		   ;;
 		h) showUsage
 		   exit 0
 		   ;;
@@ -478,6 +482,14 @@ checkDependencies || {
 
 # Load config file
 . ${AIRBACK_CONFIG_FILE}
+
+#
+# Check if daemon mode override flag is on
+#
+[ "${RUN_AS_DAEMON_OVERRIDE}" -eq 1 ] && {
+	logDebug "Run as daemon override mode requested on command line."
+	RUN_AS_DAEMON=1
+}
 
 #
 # Check paths
