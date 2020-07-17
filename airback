@@ -19,9 +19,11 @@ VERSION="20200714"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG=0
+LOGFILE="${AIRBACK_ROOT_DIR}/airback.log"
+USE_LOGFILE=1
 REMOTE_IS_ALREADY_MOUNTED=0
 VERBOSITY=""
-RSYNC_CMD="nice -n 20 rsync -${VERBOSITY}rultR --chmod=774"
+RSYNC_CMD="nice -n 20 rsync ${VERBOSITY} -rultR --chmod=774"
 NMAP_CMD="nice -n 20 nmap "
 USAGE_INFO_TEXT="
 
@@ -35,8 +37,10 @@ USAGE
 
 OPTIONS
         -c            : Show config file
-        -d            : Show debug infos
+        -C            : Create new config file with user input
+        -d            : Show debug infos, be verbose
         -h            : Show usage information
+	-n            : Do not use logfile
 	-S [VARIABLE] : set VARIABLE to set in config file (use together with -V)
 	-V [VALUE]    : set VALUE to set variable to value in config file (use together with -S)
         -v            : Show program version
@@ -47,6 +51,19 @@ OPTIONS
 #
 # FUNCTIONS
 #
+
+function logInfo() {
+	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | tee -a ${LOGFILE}
+}
+
+function logDebug() {
+	if [ "${DEBUG}" -eq 0 ];then 
+		echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && cat ${LOGFILE} )
+	else
+		[ ${USE_LOGFILE} -eq 1 ] && echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | tee -a ${LOGFILE}
+	fi
+}
+
 # Args: IP PORT
 checkForRunningPortServer() {
 	logDebug "Checking for mobile..."
@@ -62,15 +79,6 @@ checkForRunningPortServer() {
 	}
 	logDebug "Mobile "$1" port "$2" not found."
 	return 1
-}
-
-function logInfo() {
-	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}"
-}
-
-function logDebug() {
-	[ $DEBUG -eq 0 ] && return
-	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}"
 }
 
 function checkLocalMobileMountpointBase() {
@@ -104,7 +112,7 @@ function mountMobile() {
 	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
 	REMOTE_IS_ALREADY_MOUNTED=$?
 	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
-		curlftpfs -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+		curlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 		RET_VAL=$?
 		[ "$RET_VAL" -ne 0 ] && {
 			logDebug "Mobile could not be mounted."
@@ -156,7 +164,7 @@ function doBackup() {
 	cd - 2>&1 >/dev/null
 	logDebug  "Unmounting mobile filesystem..."
 	sleep ${SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH}
-	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 	RET_VAL=$?
 	[ $RET_VAL -ne 0 ] && {
 		logDebug "Error unmounting mobile."
@@ -169,7 +177,13 @@ function createDefaultConfigFile() {
 	[ -d ${AIRBACK_ROOT_DIR} ] || {
 		logDebug "Root folder not found."
 		logInfo "Creating root folder: ${AIRBACK_ROOT_DIR}"
-		mkdir -p ${AIRBACK_ROOT_DIR}
+		mkdir -p ${AIRBACK_ROOT_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+	}
+	[ -r ${AIRBACK_CONFIG_FILE} ] && {
+		logInfo "Found existing configfile: ${AIRBACK_CONFIG_FILE}"
+		BACKUP_CONFIG_FILE=${AIRBACK_CONFIG_FILE}_`date "+%Y%m%d%H%M%S"`
+		logInfo "Creating backup file: ${BACKUP_CONFIG_FILE}"
+		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 	}
 	logInfo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
 echo '
@@ -282,7 +296,7 @@ function setVariableInConfigFile() {
 	logDebug "Value    : ${2}"
 	SED_PARAM="s#${1}=.*#${1}=${2}#g"
 	logDebug "SED_PARAM=$SED_PARAM"
-	sed -i "$SED_PARAM" ${AIRBACK_CONFIG_FILE}
+	sed -i "$SED_PARAM" ${AIRBACK_CONFIG_FILE} 2>&1 | tee -a ${LOGFILE}
 	RET_VAL=$?
 	if [ "$RET_VAL" -eq 0 ];then
 		logDebug "Variable ${1} set to ${2} in configfile ${AIRBACK_CONFIG_FILE}."
@@ -373,10 +387,12 @@ function setVariablesInConfigFileFromUserInput() {
 # Evaluate arguments
 #
 ACTION=""
-while getopts "cdhS:vV:" options;do
+while getopts "cCdhnS:vV:" options;do
 	case "$options" in
 		c) showConfigFile
 		   exit 0
+		   ;;
+		C) ACTION="CREATE_CONFIGFILE"
 		   ;;
 		d) DEBUG=1
 		   VERBOSITY="v"
@@ -384,6 +400,8 @@ while getopts "cdhS:vV:" options;do
 		   ;;
 		h) showUsage
 		   exit 0
+		   ;;
+		n) USE_LOGFILE=0
 		   ;;
 		S) ACTION="SET_VARIABLE_IN_CONFIG"
 		   VAR_NAME=${OPTARG}
@@ -394,6 +412,9 @@ while getopts "cdhS:vV:" options;do
 		v) showVersionInfo
 		   exit 0
 		   ;;
+#		[?]) showUsage
+#		   exit 0
+#		   ;;
 		*) showUsage
 		   exit 0
 		   ;;
@@ -424,6 +445,16 @@ if [ "$ACTION" = "SET_VARIABLE_IN_CONFIG" ];then
 	echo
 	exit 0
 fi
+
+if [ "$ACTION" = "CREATE_CONFIGFILE" ];then
+	createDefaultConfigFile
+	setVariablesInConfigFileFromUserInput || {
+		logInfo "Error: check config file manually: ${AIRBACK_CONFIG_FILE}" 
+		exit
+	}
+	exit 0
+fi
+
 
 #
 # Check dependencies
