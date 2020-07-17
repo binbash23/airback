@@ -24,7 +24,7 @@ USE_LOGFILE="1"
 RUN_AS_DAEMON_OVERRIDE="0"
 REMOTE_IS_ALREADY_MOUNTED="0"
 VERBOSITY=""
-RSYNC_CMD="nice -n 20 rsync ${VERBOSITY} -rultR --chmod=774"
+RSYNC_CMD="nice -n 20 rsync -rultR --chmod=774"
 NMAP_CMD="nice -n 20 nmap "
 USAGE_INFO_TEXT="
 
@@ -55,12 +55,12 @@ OPTIONS
 #
 
 function logInfo() {
-	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | cat | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) 
+	echo "INFO  - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | cat
 }
 
 function logDebug() {
 	[ "${DEBUG}" -eq 0 ] && return
-	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | cat
+	echo "DEBUG - `date "+%Y%m%d %H:%M:%S"` : ${1}" | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | cat
 }
 
 # Args: IP PORT
@@ -111,7 +111,7 @@ function mountMobile() {
 	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
 	REMOTE_IS_ALREADY_MOUNTED=$?
 	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
-		curlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+		curlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 		RET_VAL=$?
 		[ "$RET_VAL" -ne 0 ] && {
 			logDebug "Mobile could not be mounted."
@@ -125,43 +125,67 @@ function mountMobile() {
 	fi
 }
 
+#
+# Warning: be in the LOCAL_MOBILE_MOUNTPOINT_BASE dir!
+#
+function runRsync() {
+	REMOTE_DIR_TO_BACKUP="${1}"
+	logDebug "Trying to sync folder: ${REMOTE_DIR_TO_BACKUP}"
+	[ ! -d "${REMOTE_DIR_TO_BACKUP}" ] && {
+		logDebug "Remote folder: ${REMOTE_DIR_TO_BACKUP} not found."
+		logDebug "Skipping sync."
+		return
+	}
+	logDebug "Syncing remote folder: ${REMOTE_DIR_TO_BACKUP} to ${LOCAL_BACKUP_TARGET_BASE_DIR}..."
+	${RSYNC_CMD} ${VERBOSITY} ${REMOTE_DIR_TO_BACKUP} ${LOCAL_BACKUP_TARGET_BASE_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+}
+
 function doBackup() {
 	mountMobile || {
 		logInfo "Error: mounting mobile failed."
 		return 1
 	}
-	cd ${LOCAL_MOBILE_MOUNTPOINT_BASE}
+	cd ${LOCAL_MOBILE_MOUNTPOINT_BASE} || {
+		logInfo "Error changing into local mount folder: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
+		exit 1
+	}
 
-	#-------------Copy Folders START-------------------#
-	logDebug  "Syncing DCIM/Camera..."
-	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing DCIM/Screenshots..."
-	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing Pictures..."
-	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing Movies..."
-	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing Music..."
-	${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing Telegram..."
-	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing WhatsApp..."
-	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#--------------------------------------------------#
-	logDebug  "Syncing Signal..."
-	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
-	#-------------Copy Folders END---------------------#
+	FOLDERS_TO_BACKUP="DCIM/Camera DCIM/Screenshots Pictures Movies Music Telegram WhatsApp Signal"
+
+	for FOLDER in ${FOLDERS_TO_BACKUP}; do
+		runRsync "${FOLDER}"
+	done
+
+#	#-------------Copy Folders START-------------------#
+#	logDebug  "Syncing DCIM/Camera..."
+#	${RSYNC_CMD} DCIM/Camera ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing DCIM/Screenshots..."
+#	${RSYNC_CMD} DCIM/Screenshots ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing Pictures..."
+#	${RSYNC_CMD} Pictures ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing Movies..."
+#	${RSYNC_CMD} Movies ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing Music..."
+#	${RSYNC_CMD} Music ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing Telegram..."
+#	${RSYNC_CMD} Telegram ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing WhatsApp..."
+#	${RSYNC_CMD} WhatsApp ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#--------------------------------------------------#
+#	logDebug  "Syncing Signal..."
+#	${RSYNC_CMD} Signal ${LOCAL_BACKUP_TARGET_BASE_DIR}
+#	#-------------Copy Folders END---------------------#
 
 	cd - 2>&1 >/dev/null
 	logDebug  "Unmounting mobile filesystem..."
 	sleep ${SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH}
-	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+	fusermount -u ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 	RET_VAL=$?
 	[ $RET_VAL -ne 0 ] && {
 		logDebug "Error unmounting mobile."
@@ -174,13 +198,13 @@ function createDefaultConfigFile() {
 	[ -d ${AIRBACK_ROOT_DIR} ] || {
 		logDebug "Root folder not found."
 		logInfo "Creating root folder: ${AIRBACK_ROOT_DIR}"
-		mkdir -p ${AIRBACK_ROOT_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+		mkdir -p ${AIRBACK_ROOT_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 	}
 	[ -r ${AIRBACK_CONFIG_FILE} ] && {
 		logInfo "Found existing configfile: ${AIRBACK_CONFIG_FILE}"
 		BACKUP_CONFIG_FILE=${AIRBACK_CONFIG_FILE}_`date "+%Y%m%d%H%M%S"`
 		logInfo "Creating backup file: ${BACKUP_CONFIG_FILE}"
-		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && cat >> ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
+		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} ) | ( [ "${DEBUG}" -eq 1 ] && cat )
 	}
 	logInfo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
 echo '
@@ -391,16 +415,18 @@ while getopts "cCdDhnS:vV:" options;do
 		   ;;
 		C) ACTION="CREATE_CONFIGFILE"
 		   ;;
-		d) DEBUG=1
-		   VERBOSITY="v"
-		   RSYNC_CMD="${RSYNC_CMD} -v"
+		d) logDebug "Debug mode enabled."
+		   DEBUG=1
+		   VERBOSITY="-v"
 		   ;;
-		D) RUN_AS_DAEMON_OVERRIDE=1
+		D) logDebug "Run as daemon override enabled."
+		   RUN_AS_DAEMON_OVERRIDE=1
 		   ;;
 		h) showUsage
 		   exit 0
 		   ;;
-		n) USE_LOGFILE=0
+		n) logDebug "Use logfile disabled."
+		   USE_LOGFILE=0
 		   ;;
 		S) ACTION="SET_VARIABLE_IN_CONFIG"
 		   VAR_NAME=${OPTARG}
@@ -411,9 +437,6 @@ while getopts "cCdDhnS:vV:" options;do
 		v) showVersionInfo
 		   exit 0
 		   ;;
-#		[?]) showUsage
-#		   exit 0
-#		   ;;
 		*) showUsage
 		   exit 0
 		   ;;
