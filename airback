@@ -15,7 +15,7 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="20200717"
+VERSION="20200724"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -55,6 +55,7 @@ OPTIONS
 #
 
 function cleanUpAndExit() {
+	echo
 	logInfo "STRG-C detected. Cleaning up..."
 	unmountMobile
 	logInfo "Exiting."
