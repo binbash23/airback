@@ -47,7 +47,50 @@ OPTIONS
 	-V [VALUE]    : set VALUE to set variable to value in config file (use together with -S)
         -v            : Show program version
 
+EXAMPLES
+
+	1) Show help and usage info:
+		> airback -h
+	2) Show config file:
+		> airback -c
+	3) Configure airback:
+		> airback -C
+	4) Start airback:
+		> airback -d
+	5) Set mobile backup interval to 30 sec:
+		> airback -S BACKUP_INTERVAL_SEC -V 30
+
 "
+DEFAULT_CONFIG_FILE='#
+# airback.conf
+#
+# 2020 by jens heine <binbash@gmx.net>
+#         Dennis Brossat <dennis.brossat@email.de>
+#         Benjamin Heine <benjaminheine@gmx.net>
+#
+# Configuration file for airback - backup your mobile device over wifi
+#
+
+# Local folder where remote device will be mounted
+LOCAL_MOBILE_MOUNTPOINT_BASE="${AIRBACK_ROOT_DIR}/mnt"
+# Local folder where remote files will be saved
+LOCAL_BACKUP_TARGET_BASE_DIR="${AIRBACK_ROOT_DIR}/backup"
+# Remote access configuration
+# Note: Enable implicit ssl mode on server
+MOBILE_HOST="192.168.1.21"
+MOBILE_PORT="10000"
+MOBILE_USER="ftpuser"
+MOBILE_USER_PASS="pass"
+# Which folders from your mobile should be synced?"
+MOBILE_FOLDERS_TO_BACKUP="DCIM/Camera DCIM/Screenshots Pictures Movies Music Telegram WhatsApp Signal"
+# Run airback as a daemon who polls for the mobile
+RUN_AS_DAEMON="1"
+# Polling interval to find the mobile in seconds
+SEARCH_MOBILE_INTERVAL_SEC="5"
+# Interval for doing backups
+BACKUP_INTERVAL_SEC="600"
+SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH="1"
+'
 
 
 #
@@ -173,10 +216,12 @@ function doBackup() {
 		logInfo "Error changing into local mount folder: ${LOCAL_MOBILE_MOUNTPOINT_BASE}"
 		exit 1
 	}
+	[ "${MOBILE_FOLDERS_TO_BACKUP}" ] || {
+		logInfo "Error: There are no folders to backup from the mobile in the config file."
+		exit 1
+	}
 
-	FOLDERS_TO_BACKUP="DCIM/Camera DCIM/Screenshots Pictures Movies Music Telegram WhatsApp Signal"
-
-	for FOLDER in ${FOLDERS_TO_BACKUP}; do
+	for FOLDER in ${MOBILE_FOLDERS_TO_BACKUP}; do
 		runRsync "${FOLDER}"
 	done
 
@@ -197,42 +242,19 @@ function createDefaultConfigFile() {
 		logInfo "Creating root folder: ${AIRBACK_ROOT_DIR}"
 		mkdir -p ${AIRBACK_ROOT_DIR} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
 	}
-	[ -r ${AIRBACK_CONFIG_FILE} ] && {
-		logInfo "Found existing configfile: ${AIRBACK_CONFIG_FILE}"
-		BACKUP_CONFIG_FILE=${AIRBACK_CONFIG_FILE}_`date "+%Y%m%d%H%M%S"`
-		logInfo "Creating backup file: ${BACKUP_CONFIG_FILE}"
-		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
-	}
-	logInfo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
-echo '
-#
-# airback.conf
-#
-# 20200709 jens heine <binbash@gmx.net>
-#          Dennis Brossat <dennis.brossat@email.de>
-#          Benjamin Heine <benjaminheine@gmx.net>
-#
-# Configuration file for airback - backup your mobile device over wifi
-#
-
-# Local folder where remote device will be mounted
-LOCAL_MOBILE_MOUNTPOINT_BASE="${AIRBACK_ROOT_DIR}/mnt"
-# Local folder where remote files will be saved
-LOCAL_BACKUP_TARGET_BASE_DIR="${AIRBACK_ROOT_DIR}/backup"
-# Remote access configuration
-# Note: Enable implicit ssl mode on server
-MOBILE_HOST="192.168.1.21"
-MOBILE_PORT="10000"
-MOBILE_USER="ftpuser"
-MOBILE_USER_PASS="pass"
-# Run airback as a daemon who polls for the mobile
-RUN_AS_DAEMON="1"
-# Polling interval to find the mobile in seconds
-SEARCH_MOBILE_INTERVAL_SEC="5"
-# Interval for doing backups
-BACKUP_INTERVAL_SEC="600"
-SLEEP_TIME_TO_WAIT_FOR_MOBILE_FLUSH="1"
-' > ${AIRBACK_CONFIG_FILE}	
+#	[ -r ${AIRBACK_CONFIG_FILE} ] && {
+#		logInfo "Found existing configfile: ${AIRBACK_CONFIG_FILE}"
+#		BACKUP_CONFIG_FILE=${AIRBACK_CONFIG_FILE}_`date "+%Y%m%d%H%M%S"`
+#		logInfo "Creating backup file: ${BACKUP_CONFIG_FILE}"
+#		mv ${AIRBACK_CONFIG_FILE} ${BACKUP_CONFIG_FILE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
+#	}
+#	logInfo "Creating default conf file ${AIRBACK_CONFIG_FILE}"
+	if [ ! -f "${AIRBACK_CONFIG_FILE}" ];then
+		echo "${DEFAULT_CONFIG_FILE}" > ${AIRBACK_CONFIG_FILE}
+		logInfo "Default config file created."
+	else
+		logInfo "Create default config file: airback config file already exists."
+	fi
 }
 
 function checkForCommand() {
@@ -291,6 +313,10 @@ function showConfigFile() {
 	echo " Print airback configuration file"
 	echo " Filename: ${AIRBACK_CONFIG_FILE}"
 	echo
+	[ -f "${AIRBACK_CONFIG_FILE}" ] || {
+		logInfo "Config file does not exist."
+		return 1
+	}
 	cat ${AIRBACK_CONFIG_FILE}
 }
 
@@ -301,7 +327,8 @@ function setVariableInConfigFile() {
         }
         [ ! "${2}" ] && {
                 logDebug "Error: Value for variable missing."
-                return 1
+                return 0
+#                return 1
         }
 	grep "${1}" "${AIRBACK_CONFIG_FILE}" >/dev/null 2>&1
 	RET_VAL=$?
@@ -312,7 +339,7 @@ function setVariableInConfigFile() {
 	logDebug "Setting new value for variable in config file:"
 	logDebug "Variable : ${1}"
 	logDebug "Value    : ${2}"
-	SED_PARAM="s#${1}=.*#${1}=${2}#g"
+	SED_PARAM="s#${1}=.*#${1}=\"${2}\"#g"
 	logDebug "SED_PARAM=$SED_PARAM"
 	sed -i "$SED_PARAM" ${AIRBACK_CONFIG_FILE} 2>&1 | tee -a ${LOGFILE}
 	RET_VAL=$?
@@ -326,14 +353,23 @@ function setVariableInConfigFile() {
 }
 
 function setVariablesInConfigFileFromUserInput() {
+	[ -f ${AIRBACK_CONFIG_FILE} ] || {
+		logInfo "No config file found. Variables can not be set!"
+		return 1
+	}
+	echo 
+	showConfigFile
 	echo
 	echo " Please set the variables for your config file."
+	echo " If you want to leave a variable unchanged, just press enter."
 	echo
 	read -p " Enter the IP of your mobile                               : " U_MOBILE_HOST
 	read -p " Enter the port mobile ftp service                         : " U_MOBILE_PORT
 	read -p " Enter the ftp username                                    : " U_MOBILE_USER
 	read -sp " Enter the ftp password                                    : " U_MOBILE_USER_PASS
 	echo
+        echo    " Enter mobile folders to be backed up. Leave empty for"
+        read -p	"  default values (Pictures, videos, whatsapp, ...)         : " U_MOBILE_FOLDERS_TO_BACKUP
 	echo    " Enter the local path where your mobile filesystem"
         read -p "  will be mounted to (it will be created if needed)        : " U_LOCAL_MOBILE_MOUNTPOINT_BASE
 	echo    " Enter the local path where the files from your mobile"
@@ -352,20 +388,21 @@ function setVariablesInConfigFileFromUserInput() {
 	logDebug "U_MOBILE_PORT                  : $U_MOBILE_PORT"
 	logDebug "U_MOBILE_USER                  : $U_MOBILE_USER"
 	logDebug "U_MOBILE_USER_PASS             : $U_MOBILE_USER_PASS"
+	logDebug "U_MOBILE_FOLDERS_TO_BACKUP     : $U_MOBILE_FOLDERS_TO_BACKUP"
 	logDebug "U_LOCAL_MOBILE_MOUNTPOINT_BASE : $U_LOCAL_MOBILE_MOUNTPOINT_BASE"
 	logDebug "U_LOCAL_BACKUP_TARGET_BASE_DIR : $U_LOCAL_BACKUP_TARGET_BASE_DIR"
 	logDebug "U_RUN_AS_DAEMON                : $U_RUN_AS_DAEMON"
 	logDebug "U_SEARCH_MOBILE_INTERVAL_SEC   : $U_SEARCH_MOBILE_INTERVAL_SEC"
 	logDebug "U_BACKUP_INTERVAL_SEC          : $U_BACKUP_INTERVAL_SEC"
-	[ ! "$U_MOBILE_HOST" -o ! "$U_MOBILE_PORT" -o ! "$U_MOBILE_USER" \
- 	  -o ! "$U_MOBILE_USER_PASS" -o ! "$U_LOCAL_MOBILE_MOUNTPOINT_BASE" \
-	  -o ! "$U_LOCAL_BACKUP_TARGET_BASE_DIR" -o ! "$U_RUN_AS_DAEMON" \
-	  -o ! "$U_SEARCH_MOBILE_INTERVAL_SEC" \
-	  -o ! "$U_BACKUP_INTERVAL_SEC" ] && {
-		logInfo "Error: Variables must not be empty." 
-		return 1
-	}
-	logDebug "Setting variables and writing config file..."
+#	[ ! "$U_MOBILE_HOST" -o ! "$U_MOBILE_PORT" -o ! "$U_MOBILE_USER" \
+# 	  -o ! "$U_MOBILE_USER_PASS" -o ! "$U_LOCAL_MOBILE_MOUNTPOINT_BASE" \
+#	  -o ! "$U_LOCAL_BACKUP_TARGET_BASE_DIR" -o ! "$U_RUN_AS_DAEMON" \
+#	  -o ! "$U_SEARCH_MOBILE_INTERVAL_SEC" \
+#	  -o ! "$U_BACKUP_INTERVAL_SEC" ] && {
+#		logInfo "Error: Variables must not be empty." 
+#		return 1
+#	}
+	logDebug "Setting variables in config file..."
 	CONFIG_FILE_ERRORS=0
 	setVariableInConfigFile "MOBILE_HOST" "${U_MOBILE_HOST}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
@@ -374,6 +411,8 @@ function setVariablesInConfigFileFromUserInput() {
 	setVariableInConfigFile "MOBILE_USER" "${U_MOBILE_USER}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
 	setVariableInConfigFile "MOBILE_USER_PASS" "${U_MOBILE_USER_PASS}"
+        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+	setVariableInConfigFile "MOBILE_FOLDERS_TO_BACKUP" "${U_MOBILE_FOLDERS_TO_BACKUP}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
 	setVariableInConfigFile "LOCAL_MOBILE_MOUNTPOINT_BASE" "${U_LOCAL_MOBILE_MOUNTPOINT_BASE}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
@@ -408,6 +447,7 @@ ACTION=""
 while getopts "cCdDhnqS:vV:" options;do
 	case "$options" in
 		c) showConfigFile
+		   echo
 		   exit 0
 		   ;;
 		C) ACTION="CREATE_CONFIGFILE"
