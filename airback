@@ -44,6 +44,7 @@ OPTIONS
         -h            : Show usage information
 	-n            : Do not use logfile
 	-S [VARIABLE] : set VARIABLE to set in config file (use together with -V)
+	-t            : Tail airback logfile
 	-V [VALUE]    : set VALUE to set variable to value in config file (use together with -S)
         -v            : Show program version
 
@@ -444,7 +445,7 @@ function setVariablesInConfigFileFromUserInput() {
 # Evaluate arguments
 #
 ACTION=""
-while getopts "cCdDhnqS:vV:" options;do
+while getopts "cCdDhnqS:tvV:" options;do
 	case "$options" in
 		c) showConfigFile
 		   echo
@@ -467,6 +468,8 @@ while getopts "cCdDhnqS:vV:" options;do
 		   ;;
 		S) ACTION="SET_VARIABLE_IN_CONFIG"
 		   VAR_NAME=${OPTARG}
+		   ;;
+		t) ACTION="TAIL_LOGFILE"
 		   ;;
 		V) ACTION="SET_VARIABLE_IN_CONFIG"
 		   VAR_VALUE=${OPTARG}
@@ -512,6 +515,16 @@ if [ "$ACTION" = "CREATE_CONFIGFILE" ];then
 		exit
 	}
 	exit 0
+fi
+
+if [ "$ACTION" = "TAIL_LOGFILE" ];then
+	if [ -f "${LOGFILE}" ];then
+		tail -f "$LOGFILE"
+		exit 0
+	else
+		logInfo "Logfile \"${LOGFILE}\" not found."
+		exit 1
+	fi
 fi
 
 
