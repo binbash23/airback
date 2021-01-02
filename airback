@@ -15,7 +15,7 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="20200724"
+VERSION="20210102"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -37,16 +37,19 @@ USAGE
         airback OPTIONS
 
 OPTIONS
-        -c            : Show config file
-        -C            : Create new config file with user input
-        -d            : Show debug infos, be verbose
-	-D            : Run as daemon even if deactivated in config file
-        -h            : Show usage information
-	-n            : Do not use logfile
-	-S [VARIABLE] : set VARIABLE to set in config file (use together with -V)
-	-t            : Tail airback logfile
-	-V [VALUE]    : set VALUE to set variable to value in config file (use together with -S)
-        -v            : Show program version
+        -c              : Show config file
+        -C              : Create new config file with user input
+        -d              : Show debug infos, be verbose
+	-D              : Run as daemon even if deactivated in config file
+        -h              : Show usage information
+	-l [LOGFILE]    : Use LOGFILE as logfile (to use with multiple mobiles)
+	-n              : Do not use logfile
+	-S [VARIABLE]   : set VARIABLE to set in config file (use together with -V)
+	-t              : Tail airback logfile
+	-u [CONFIGFILE] : Use CONFIGFILE as airback configuration. Use this option 
+	                  to run airback with multiple mobiles.
+	-V [VALUE]      : set VALUE to set variable to value in config file (use together with -S)
+        -v              : Show program version
 
 EXAMPLES
 
@@ -56,10 +59,14 @@ EXAMPLES
 		> airback -c
 	3) Configure airback:
 		> airback -C
-	4) Start airback:
+	4) Start airback in debug/verbose mode:
 		> airback -d
 	5) Set mobile backup interval to 30 sec:
 		> airback -S BACKUP_INTERVAL_SEC -V 30
+	6) Use another configfile as the default one with a custom logfile
+	   (use one instance of airback for each of your mobiles):
+	        > airback -u /home/user/airback/airback_mobile2.conf -l /home/user/airback/airback_mobile2.log
+	        > airback -u /home/user/airback/airback_mobile3.conf -l /home/user/airback/airback_mobile3.log
 
 "
 DEFAULT_CONFIG_FILE='#
@@ -82,7 +89,7 @@ MOBILE_HOST="192.168.1.21"
 MOBILE_PORT="10000"
 MOBILE_USER="ftpuser"
 MOBILE_USER_PASS="pass"
-# Which folders from your mobile should be synced?"
+# Which folders from your mobile should be synced?
 MOBILE_FOLDERS_TO_BACKUP="DCIM/Camera DCIM/Screenshots Pictures Movies Music Telegram WhatsApp Signal"
 # Run airback as a daemon who polls for the mobile
 RUN_AS_DAEMON="1"
@@ -382,9 +389,9 @@ function setVariablesInConfigFileFromUserInput() {
 	read -p " Set backup interval in s  (default 600)                   : " U_BACKUP_INTERVAL_SEC
 	echo
 	# set default values
-	U_RUN_AS_DAEMON=${U_RUN_AS_DAEMON:-1}
-	U_SEARCH_MOBILE_INTERVAL_SEC=${U_SEARCH_MOBILE_INTERVAL_SEC:-30}
-	U_BACKUP_INTERVAL_SEC=${U_BACKUP_INTERVAL_SEC:-600}
+#	U_RUN_AS_DAEMON=${U_RUN_AS_DAEMON:-1}
+#	U_SEARCH_MOBILE_INTERVAL_SEC=${U_SEARCH_MOBILE_INTERVAL_SEC:-30}
+#	U_BACKUP_INTERVAL_SEC=${U_BACKUP_INTERVAL_SEC:-600}
 	logDebug "U_MOBILE_HOST                  : $U_MOBILE_HOST"
 	logDebug "U_MOBILE_PORT                  : $U_MOBILE_PORT"
 	logDebug "U_MOBILE_USER                  : $U_MOBILE_USER"
@@ -445,8 +452,14 @@ function setVariablesInConfigFileFromUserInput() {
 # Evaluate arguments
 #
 ACTION=""
-while getopts "cCdDhnqS:tvV:" options;do
+while getopts "l:u:cCdDhnqS:tvV:" options;do
 	case "$options" in
+		l) LOGFILE="${OPTARG}"
+		   logDebug "Using custom log file: ${LOGFILE}"
+		   ;;
+		u) AIRBACK_CONFIG_FILE="${OPTARG}"
+		   logDebug "Using custom config file: ${AIRBACK_CONFIG_FILE}"
+		   ;;
 		c) showConfigFile
 		   echo
 		   exit 0
