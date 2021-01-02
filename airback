@@ -63,7 +63,9 @@ EXAMPLES
 		> airback -d
 	5) Set mobile backup interval to 30 sec:
 		> airback -S BACKUP_INTERVAL_SEC -V 30
-	6) Use another configfile as the default one with a custom logfile
+	6) Create a new configfile for another mobile:
+                > airback -u /home/melvin/airback/airback2.conf -l /home/melvin/airback/airback2.log -C	
+	6) Run airback with a custom config- and logfile
 	   (use one instance of airback for each of your mobiles):
 	        > airback -u /home/user/airback/airback_mobile2.conf -l /home/user/airback/airback_mobile2.log
 	        > airback -u /home/user/airback/airback_mobile3.conf -l /home/user/airback/airback_mobile3.log
