@@ -5,6 +5,7 @@
 # 20200710 Jens Heine <binbash@gmx.net>
 #          Dennis Brossat <dennis.brossat@email.de>
 #          Benjamin Heine <benjaminheine@gmx.net>
+# 20250106 Jens Heine: -k option to clean hanging curlftpfs process
 #
 # airback - backup your mobile device over wifi
 #
@@ -15,7 +16,8 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="20210102"
+#VERSION="20210102"
+VERSION="20250106"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -42,6 +44,7 @@ OPTIONS
         -d              : Show debug infos, be verbose
 	-D              : Run as daemon even if deactivated in config file
         -h              : Show usage information
+        -k              : Kill hanging curlftpfs and force umount of mountpoint
 	-l [LOGFILE]    : Use LOGFILE as logfile (to use with multiple mobiles)
 	-n              : Do not use logfile
 	-S [VARIABLE]   : set VARIABLE to set in config file (use together with -V)
@@ -444,6 +447,14 @@ function setVariablesInConfigFileFromUserInput() {
 }
 
 
+function kill_hanging_mount() {
+    echo "Trying to kill curlftpfs process(es)..."
+    sudo /usr/bin/pkill curlftpfs
+    echo "Forcing umopunt of mountpoint..."
+    sudo /usr/bin/umount --force $LOCAL_MOBILE_MOUNTPOINT_BASE
+}
+
+
 ###################################################################################################
 #
 # MAIN
@@ -454,7 +465,7 @@ function setVariablesInConfigFileFromUserInput() {
 # Evaluate arguments
 #
 ACTION=""
-while getopts "l:u:cCdDhnqS:tvV:" options;do
+while getopts "kl:u:cCdDhnqS:tvV:" options;do
 	case "$options" in
 		l) LOGFILE="${OPTARG}"
 		   logDebug "Using custom log file: ${LOGFILE}"
@@ -476,6 +487,12 @@ while getopts "l:u:cCdDhnqS:tvV:" options;do
 		   RUN_AS_DAEMON_OVERRIDE=1
 		   ;;
 		h) showUsage
+		   exit 0
+		   ;;
+		k) # Load config file and try to free mountpoint
+           . ${AIRBACK_CONFIG_FILE}
+           kill_hanging_mount
+		   echo
 		   exit 0
 		   ;;
 		n) logDebug "Use logfile disabled."
