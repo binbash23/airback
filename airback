@@ -16,8 +16,7 @@
 # VARIABLES
 #
 # Base directory for airback
-#VERSION="20210102"
-VERSION="20250106"
+VERSION="20250109"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -26,7 +25,8 @@ USE_LOGFILE="1"
 RUN_AS_DAEMON_OVERRIDE="0"
 REMOTE_IS_ALREADY_MOUNTED="0"
 VERBOSITY=""
-RSYNC_CMD="nice -n 20 rsync -rultR --chmod=774"
+#RSYNC_CMD="nice -n 20 rsync -rultR --chmod=774"
+RSYNC_CMD="nice -n 20 rsync -rultR --chmod=774 --exclude='*/.thumbnails/' --exclude='*/.trash*/'"
 NMAP_CMD="nice -n 20 nmap "
 USAGE_INFO_TEXT="
 
