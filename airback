@@ -16,7 +16,7 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="20250205"
+VERSION="20250209"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -450,6 +450,8 @@ function setVariablesInConfigFileFromUserInput() {
 function kill_hanging_mount() {
     echo "Trying to kill curlftpfs process(es)..."
     sudo /usr/bin/pkill curlftpfs
+    echo "Waiting 3 secs..."
+    sleep 3
     echo "Forcing umopunt of mountpoint..."
     sudo /usr/bin/umount --force $LOCAL_MOBILE_MOUNTPOINT_BASE
 }
