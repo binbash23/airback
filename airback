@@ -449,11 +449,14 @@ function setVariablesInConfigFileFromUserInput() {
 
 function kill_hanging_mount() {
     echo "Trying to kill curlftpfs process(es)..."
-    sudo /usr/bin/pkill curlftpfs
-    echo "Waiting 3 secs..."
-    sleep 3
-    echo "Forcing umopunt of mountpoint..."
-    sudo /usr/bin/umount --force $LOCAL_MOBILE_MOUNTPOINT_BASE
+    #sudo /usr/bin/pkill curlftpfs
+    #echo "Waiting 3 secs..."
+    PID_OF_CURL=`pidof curlftpfs`
+    [ ! -z "$PID_OF_CURL" ] && kill -9 $PID_OF_CURL
+    #sleep 3
+    echo "Unmounting sftpfs mountpoint..."
+    #sudo /usr/bin/umount --force $LOCAL_MOBILE_MOUNTPOINT_BASE
+    fusermount -u $LOCAL_MOBILE_MOUNTPOINT_BASE
 }
 
 
