@@ -16,7 +16,7 @@ Dependencies
 First install this tools on your system:
  nmap
  fusermount
- curlftpfs
+ curlftpfs (not longer maintained :( I will change it to ssh soon)
  nice
 
 
