@@ -9,15 +9,15 @@ Do you want to backup the pictures and videos from your android mobile to your l
 Use airback and it will start backing up your data when your mobile appears in your wifi network.
 
 
-HOWTO
+## HOWTO
 
-Dependencies
+### Dependencies
 
 First install this tools on your client system (PC):
- nmap
- fusermount
- sshfs
- nice
+ - nmap
+ - fusermount
+ - sshfs
+ - nice
 
 
 Then install a ssh server on your mobile. I recommend using [termux](https://play.google.com/store/apps/details?id=com.termux&hl=de) .
