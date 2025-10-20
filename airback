@@ -16,7 +16,7 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="20250209"
+VERSION="20251020"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -89,13 +89,11 @@ LOCAL_MOBILE_MOUNTPOINT_BASE="${AIRBACK_ROOT_DIR}/mnt"
 # Local folder where remote files will be saved
 LOCAL_BACKUP_TARGET_BASE_DIR="${AIRBACK_ROOT_DIR}/backup"
 # Remote access configuration
-# Note: Enable implicit ssl mode on server
 MOBILE_HOST="192.168.1.21"
-MOBILE_PORT="10000"
-MOBILE_USER="ftpuser"
-MOBILE_USER_PASS="pass"
+MOBILE_PORT="8022"
+# Note that you will be prompted for a password. I recommend to enable ssh key authentication
 # Which folders from your mobile should be synced?
-MOBILE_FOLDERS_TO_BACKUP="DCIM/Camera DCIM/Screenshots Pictures Movies Music Telegram WhatsApp Signal"
+MOBILE_FOLDERS_TO_BACKUP="dcim/Camera dcim/Screenshots pictures movies music"
 # Run airback as a daemon who polls for the mobile
 RUN_AS_DAEMON="1"
 # Polling interval to find the mobile in seconds
@@ -186,12 +184,35 @@ function unmountMobile() {
 	fi
 }
 
-function mountMobile() {
+
+# 20251020 deprecated because cursftps is no longer available
+function mountMobileWithCurl() {
 	logDebug "Trying to mount mobile."
 	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
 	REMOTE_IS_ALREADY_MOUNTED=$?
 	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
 		curlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
+		RET_VAL=$?
+		[ "$RET_VAL" -ne 0 ] && {
+			logDebug "Mobile could not be mounted."
+			return 1
+		}
+		logDebug "Mobile mounted."
+		return 0
+	else
+		logDebug "Mobile is already mounted."
+		return 0
+	fi
+}
+
+function mountMobile() {
+	logDebug "Trying to mount mobile with sshfs..."
+	df -h|grep ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 >/dev/null
+	REMOTE_IS_ALREADY_MOUNTED=$?
+	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
+		#urlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
+        #sshfs ${VERBOSITY} -p ${MOBILE_PORT} ${MOBILE_HOST}: ${LOCAL_MOBILE_MOUNTPOINT_BASE} -o idmap=user -o follow_symlinks -o uid=$(id -u) -o gid=$(id -g) 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat )
+        sshfs ${VERBOSITY} -p ${MOBILE_PORT} ${MOBILE_HOST}:storage ${LOCAL_MOBILE_MOUNTPOINT_BASE} -o idmap=user -o follow_symlinks -o uid=$(id -u) -o gid=$(id -g) -o ServerAliveInterval=10 -o reconnect -o StrictHostKeyChecking=no
 		RET_VAL=$?
 		[ "$RET_VAL" -ne 0 ] && {
 			logDebug "Mobile could not be mounted."
@@ -300,7 +321,9 @@ function checkDependencies() {
 	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
 	checkForCommand "nmap"
 	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
-	checkForCommand "curlftpfs"
+#	checkForCommand "curlftpfs"
+#	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
+	checkForCommand "sshfs"
 	let DEPENDENCY_ERRORS=$DEPENDENCY_ERRORS+$?
 
 	[ $DEPENDENCY_ERRORS -eq 0 ] && {
