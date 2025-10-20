@@ -13,14 +13,14 @@ HOWTO
 
 Dependencies
 
-First install this tools on your system:
+First install this tools on your client system (PC):
  nmap
  fusermount
  sshfs
  nice
 
 
-Then install a ssh server on your mobile. I recommend termux.
+Then install a ssh server on your mobile. I recommend using [termux](https://play.google.com/store/apps/details?id=com.termux&hl=de).
 To install and grant access to the android filesystem you can follow these steps:
 
 - install termux on the mobile an start a session
