@@ -16,19 +16,19 @@ Dependencies
 First install this tools on your system:
  nmap
  fusermount
- curlftpfs (not longer maintained :( I will change it to ssh soon)
+ sshfs
  nice
 
 
-Then install a FTP server on your mobile. I use "WIFI FTP Server" on my android.
+Then install a ssh server on your mobile. I recommend termux.
+To install and grant access to the android filesystem you can follow these steps:
 
-Configure and start the ftp server when you want backup be done:
-- Set a ftp port number
-- Set a username and password
-- Set mode to "FTP over TLS/SSL"
-- Set SSL mode to "implicit"
-- Set root folder to "internal memory"
-- Set mode to "readonly"
+- install termux on the mobile an start a session
+- Update termux: "pkg upgrade"
+- Install ssh: "pkg install openssh"
+- Grant filesystem access to termux: "termux-setup-storage"
+- Connect from your PC to the mobile with ssh 
+- If you do not want to type the password everytime, I recommend to enable ssh key authentication (i.e. ssh-copy-id)
 
 Download airback and copy it to a folder in your path.
 Run airback:
