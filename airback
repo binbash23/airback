@@ -212,7 +212,7 @@ function mountMobile() {
 	if [ "$REMOTE_IS_ALREADY_MOUNTED" != 0 ];then
 		#urlftpfs ${VERBOSITY} -r -o ssl,no_verify_hostname,no_verify_peer,user=${MOBILE_USER}:${MOBILE_USER_PASS} ftps://${MOBILE_HOST}:${MOBILE_PORT}/ ${LOCAL_MOBILE_MOUNTPOINT_BASE} 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat ) 
         #sshfs ${VERBOSITY} -p ${MOBILE_PORT} ${MOBILE_HOST}: ${LOCAL_MOBILE_MOUNTPOINT_BASE} -o idmap=user -o follow_symlinks -o uid=$(id -u) -o gid=$(id -g) 2>&1 | ( [ "${USE_LOGFILE}" -eq 1 ] && tee -a ${LOGFILE} || cat )
-        sshfs ${VERBOSITY} -p ${MOBILE_PORT} ${MOBILE_HOST}:storage ${LOCAL_MOBILE_MOUNTPOINT_BASE} -o idmap=user -o follow_symlinks -o uid=$(id -u) -o gid=$(id -g) -o ServerAliveInterval=10 -o reconnect -o StrictHostKeyChecking=no
+        sshfs ${VERBOSITY} -p ${MOBILE_PORT} ${MOBILE_HOST}:storage ${LOCAL_MOBILE_MOUNTPOINT_BASE} -o idmap=user -o follow_symlinks -o uid=$(id -u) -o gid=$(id -g) -o ServerAliveInterval=10 -o reconnect -o StrictHostKeyChecking=no 
 		RET_VAL=$?
 		[ "$RET_VAL" -ne 0 ] && {
 			logDebug "Mobile could not be mounted."
@@ -400,12 +400,10 @@ function setVariablesInConfigFileFromUserInput() {
 	echo " If you want to leave a variable unchanged, just press enter."
 	echo
 	read -p " Enter the IP of your mobile                               : " U_MOBILE_HOST
-	read -p " Enter the port mobile ftp service                         : " U_MOBILE_PORT
-	read -p " Enter the ftp username                                    : " U_MOBILE_USER
-	read -sp " Enter the ftp password                                    : " U_MOBILE_USER_PASS
+	read -p " Enter the ssh port of the ssh service                     : " U_MOBILE_PORT
 	echo
         echo    " Enter mobile folders to be backed up. Leave empty for"
-        read -p	"  default values (Pictures, videos, whatsapp, ...)         : " U_MOBILE_FOLDERS_TO_BACKUP
+        read -p	"  default values (pictures, videos, dcim, ...)         : " U_MOBILE_FOLDERS_TO_BACKUP
 	echo    " Enter the local path where your mobile filesystem"
         read -p "  will be mounted to (it will be created if needed)        : " U_LOCAL_MOBILE_MOUNTPOINT_BASE
 	echo    " Enter the local path where the files from your mobile"
@@ -422,8 +420,8 @@ function setVariablesInConfigFileFromUserInput() {
 #	U_BACKUP_INTERVAL_SEC=${U_BACKUP_INTERVAL_SEC:-600}
 	logDebug "U_MOBILE_HOST                  : $U_MOBILE_HOST"
 	logDebug "U_MOBILE_PORT                  : $U_MOBILE_PORT"
-	logDebug "U_MOBILE_USER                  : $U_MOBILE_USER"
-	logDebug "U_MOBILE_USER_PASS             : $U_MOBILE_USER_PASS"
+#	logDebug "U_MOBILE_USER                  : $U_MOBILE_USER"
+#	logDebug "U_MOBILE_USER_PASS             : $U_MOBILE_USER_PASS"
 	logDebug "U_MOBILE_FOLDERS_TO_BACKUP     : $U_MOBILE_FOLDERS_TO_BACKUP"
 	logDebug "U_LOCAL_MOBILE_MOUNTPOINT_BASE : $U_LOCAL_MOBILE_MOUNTPOINT_BASE"
 	logDebug "U_LOCAL_BACKUP_TARGET_BASE_DIR : $U_LOCAL_BACKUP_TARGET_BASE_DIR"
@@ -444,10 +442,10 @@ function setVariablesInConfigFileFromUserInput() {
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
 	setVariableInConfigFile "MOBILE_PORT" "${U_MOBILE_PORT}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
-	setVariableInConfigFile "MOBILE_USER" "${U_MOBILE_USER}"
-        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
-	setVariableInConfigFile "MOBILE_USER_PASS" "${U_MOBILE_USER_PASS}"
-        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+#	setVariableInConfigFile "MOBILE_USER" "${U_MOBILE_USER}"
+#        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
+#	setVariableInConfigFile "MOBILE_USER_PASS" "${U_MOBILE_USER_PASS}"
+#        let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
 	setVariableInConfigFile "MOBILE_FOLDERS_TO_BACKUP" "${U_MOBILE_FOLDERS_TO_BACKUP}"
         let CONFIG_FILE_ERRORS=$CONFIG_FILE_ERRORS+$?
 	setVariableInConfigFile "LOCAL_MOBILE_MOUNTPOINT_BASE" "${U_LOCAL_MOBILE_MOUNTPOINT_BASE}"
