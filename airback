@@ -572,6 +572,7 @@ if [ "$ACTION" = "CREATE_CONFIGFILE" ];then
 		logInfo "Error: check config file manually: ${AIRBACK_CONFIG_FILE}" 
 		exit
 	}
+	echo "Configuration file created: ${AIRBACK_CONFIG_FILE}"
 	exit 0
 fi
 
