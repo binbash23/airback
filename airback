@@ -16,7 +16,7 @@
 # VARIABLES
 #
 # Base directory for airback
-VERSION="20251020"
+VERSION="20260128"
 AIRBACK_ROOT_DIR="$HOME/airback"
 AIRBACK_CONFIG_FILE="${AIRBACK_ROOT_DIR}/airback.conf"
 DEBUG="0"
@@ -30,48 +30,93 @@ RSYNC_CMD='nice -n 20 rsync -rultR --chmod=774 --exclude .thumbnails --exclude .
 NMAP_CMD="nice -n 20 nmap "
 USAGE_INFO_TEXT="
 
-        airback by Jens Heine <binbash@gmx.net> 2020
-                   and Dennis Brossat <dennis.brossat@email.de>
-                   and Benjamin Heine <benjaminheine@gmx.net>
+    airback by Jens Heine <binbash@gmx.net> 2020
+           and Dennis Brossat <dennis.brossat@email.de>
+           and Benjamin Heine <benjaminheine@gmx.net>
 
 USAGE
 
-        airback OPTIONS
+    airback [OPTIONS]
 
 OPTIONS
-        -c              : Show config file
-        -C              : Create new config file with user input
-        -d              : Show debug infos, be verbose
-	-D              : Run as daemon even if deactivated in config file
-        -h              : Show usage information
-        -k              : Kill hanging curlftpfs and force umount of mountpoint
-	-l [LOGFILE]    : Use LOGFILE as logfile (to use with multiple mobiles)
-	-n              : Do not use logfile
-	-S [VARIABLE]   : set VARIABLE to set in config file (use together with -V)
-	-t              : Tail airback logfile
-	-u [CONFIGFILE] : Use CONFIGFILE as airback configuration. Use this option 
-	                  to run airback with multiple mobiles.
-	-V [VALUE]      : set VALUE to set variable to value in config file (use together with -S)
-        -v              : Show program version
+    -c              : Show config file
+    -C              : Create new config file with user input
+    -d              : Show debug infos, be verbose
+    -D              : Run as daemon even if deactivated in config file
+    -h              : Show usage information
+    -k              : Kill hanging curlftpfs and force umount of mountpoint
+    -l [LOGFILE]    : Use LOGFILE as logfile (to use with multiple mobiles)
+    -n              : Do not use logfile
+    -S [VARIABLE]   : set VARIABLE to set in config file (use together with -V)
+    -t              : Tail airback logfile
+    -u [CONFIGFILE] : Use CONFIGFILE as airback configuration. Use this option 
+                      to run airback with multiple mobiles.
+    -V [VALUE]      : set VALUE to set variable to value in config file (use 
+                      together with -S)
+    -v              : Show program version
 
 EXAMPLES
 
-	1) Show help and usage info:
-		> airback -h
-	2) Show config file:
-		> airback -c
-	3) Configure airback:
-		> airback -C
-	4) Start airback in debug/verbose mode:
-		> airback -d
-	5) Set mobile backup interval to 30 sec:
-		> airback -S BACKUP_INTERVAL_SEC -V 30
-	6) Create a new configfile for another mobile:
-                > airback -u /home/melvin/airback/airback2.conf -l /home/melvin/airback/airback2.log -C	
-	6) Run airback with a custom config- and logfile
-	   (use one instance of airback for each of your mobiles):
-	        > airback -u /home/user/airback/airback_mobile2.conf -l /home/user/airback/airback_mobile2.log
-	        > airback -u /home/user/airback/airback_mobile3.conf -l /home/user/airback/airback_mobile3.log
+1) Show help and usage info:
+~$ airback -h
+
+2) Show config file:
+~$ airback -c
+
+3) Configure airback:
+~$ airback -C
+
+4) Start airback in debug/verbose mode:
+~$ airback -d
+
+5) Set mobile backup interval to 30 sec:
+~$ airback -S BACKUP_INTERVAL_SEC -V 30
+
+6) Create a new configfile for another mobile:
+~$ airback -u ~/airback/airback2.conf -l ~/airback/airback2.log -C	
+
+6) Run airback with a custom config- and logfile.
+   Use one instance of airback for each of your mobiles:
+~$ airback -u ~/airback/airback_mobile2.conf -l ~/airback/airback_mobile2.log
+~$ airback -u ~/airback/airback_mobile3.conf -l ~/airback/airback_mobile3.log
+
+PREREQUESITES
+
+To enable ssh access to your android handy from another device you have 
+to follow these steps:
+
+Dependencies
+
+First install this tools on your client system (PC):
+
+    nmap
+    fusermount
+    sshfs
+    nice
+
+Then install a ssh server on your mobile. I recommend using termux .
+To install and grant access to the android filesystem follow these steps:
+
+    Install termux on the mobile an start a session.
+
+    Update termux: 
+    ~ $ pkg upgrade
+
+    Install ssh: 
+    ~ $ pkg install openssh
+
+    And set a password:
+    ~ $ passwd
+
+    Grant filesystem access to termux: 
+    ~ $ termux-setup-storage
+
+    Connect from your PC to the mobile with ssh.
+    If you do not want to type the password everytime, I recommend to enable 
+    ssh key authentication (i.e. ssh-copy-id)
+
+Please send feedback Good luck, Jens
+
 
 "
 DEFAULT_CONFIG_FILE='#
